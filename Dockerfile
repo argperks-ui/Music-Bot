@@ -1,34 +1,27 @@
-# Stage 1: Build Next.js Dashboard static export
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app/Git-Music-Dashboard
+# Frontend Builder Stage
+FROM node:18 AS frontend-builder
+WORKDIR /app/music-bot
 
-COPY Git-Music-Dashboard/package*.json ./
-COPY Git-Music-Dashboard/pnpm-lock.yaml* ./
-COPY Git-Music-Dashboard/yarn.lock* ./
+COPY "music bot/package*.json" ./
+COPY "music bot/pnpm-lock.yaml*" ./
+COPY "music bot/yarn.lock*" ./
 RUN npm install
 
-COPY Git-Music-Dashboard/ ./
+COPY "music bot/" ./
 RUN npm run build
 
-# Stage 2: Python Runtime & Bot Server
+# Backend Stage
 FROM python:3.11-slim
+WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg build-essential libffi-dev libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 1. Copy repository source code FIRST
 COPY . .
+COPY --from=frontend-builder /app/music-bot/dist ./dist
 
-# 2. Copy compiled static frontend AFTER so COPY . . cannot overwrite it
-COPY --from=frontend-builder /app/Git-Music-Dashboard/out ./Git-Music-Dashboard/out
-
-ENV PORT=3000
-EXPOSE 3000
-
-CMD ["python", "bot.py"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
