@@ -1,28 +1,22 @@
-FROM python:3.11-slim
+FROM node:20-slim
 
-# Install system dependencies, Git, FFmpeg, and Node.js
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    git \
-    curl \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Install Python and pip
+RUN apt-get update && apt-get install -y python3 python3-pip && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy dependency files first to leverage caching
-COPY requirements.txt package.json ./
-
-# Install Python and Node dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy package files and install Node dependencies
+COPY package*.json ./
 RUN npm install
 
-# Copy the rest of your project files
+# Copy Python requirements and install them
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
+
+# Copy the rest of your app code
 COPY . .
 
-# Grant execution permission to the start script
+# Make start script executable
 RUN chmod +x start.sh
 
-# Run the startup script
 CMD ["./start.sh"]
