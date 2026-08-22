@@ -62,7 +62,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'git-music-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+  cookie: { secure: true, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
 // 🌟 Global View Variables Middleware (Prevents all missing variable errors permanently)
@@ -76,6 +76,9 @@ app.use((req, res, next) => {
   res.locals.voice = 0;
   res.locals.apiLatency = 0;
   res.locals.heartbeat = { voiceCount: 0, ping: 0 };
+  res.locals.nodeVer = process.version;
+  res.locals.platform = process.platform;
+  res.locals.memory = { heapUsed: 0, heapTotal: 0, rss: 0 };
   
   const clientId = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
   res.locals.INVITE = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`;
@@ -197,9 +200,14 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     
     let totalMembers = 0;
     let voiceConnections = 0;
-    if (Array.isArray(botGuilds)) {
-      for (const g of botGuilds.slice(0, 50)) {
-        const guild = await discordFetch(`/guilds/${g.id}?with_counts=true`);
+    
+    // ⚡ Optimized parallel fetching with Promise.all
+    if (Array.isArray(botGuilds) && botGuilds.length > 0) {
+      const guildsToFetch = botGuilds.slice(0, 50);
+      const guildPromises = guildsToFetch.map(g => discordFetch(`/guilds/${g.id}?with_counts=true`));
+      const fetchedGuilds = await Promise.all(guildPromises);
+      
+      for (const guild of fetchedGuilds) {
         if (guild && guild.approximate_member_count) {
           totalMembers += guild.approximate_member_count;
         }
@@ -227,6 +235,13 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     await discordFetch('/gateway');
     const ping = Date.now() - pingStart;
 
+    const memUsage = process.memoryUsage();
+    const memory = {
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100,
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024 * 100) / 100,
+      rss: Math.round(memUsage.rss / 1024 / 1024 * 100) / 100
+    };
+
     res.render('dashboard', {
       title: 'Dashboard',
       bot: botUser,
@@ -238,6 +253,9 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       voice: voiceConnections,
       heartbeat: { voiceCount: voiceConnections, ping: ping },
       apiLatency: ping,
+      nodeVer: process.version,
+      platform: process.platform,
+      memory,
       todayCommands,
       totalCommands,
       uptime,
@@ -254,17 +272,21 @@ app.get('/guilds', requireAuth, async (req, res) => {
   try {
     const botGuilds = await discordFetch('/users/@me/guilds') || [];
     
-    const enriched = [];
-    for (const g of botGuilds.slice(0, 100)) {
-      const guild = await discordFetch(`/guilds/${g.id}?with_counts=true`);
-      enriched.push({
+    // ⚡ Optimized parallel fetching for server list page too
+    const guildsToFetch = botGuilds.slice(0, 100);
+    const guildPromises = guildsToFetch.map(g => discordFetch(`/guilds/${g.id}?with_counts=true`));
+    const fetchedGuilds = await Promise.all(guildPromises);
+
+    const enriched = guildsToFetch.map((g, index) => {
+      const guild = fetchedGuilds[index];
+      return {
         id: g.id,
         name: guild ? guild.name : g.name,
         icon: guild ? guild.icon : g.icon,
         memberCount: guild ? guild.approximate_member_count : '?',
         ownerId: guild ? guild.owner_id : '',
-      });
-    }
+      };
+    });
 
     res.render('guilds', {
       title: 'Servers',
