@@ -9,6 +9,7 @@ const { Server } = require('socket.io');
 const Database = require('better-sqlite3');
 
 const app = express();
+app.set('trust proxy', 1); // 👈 Added to fix the login/session loop on Render
 const server = http.createServer(app);
 const io = new Server(server);
 
