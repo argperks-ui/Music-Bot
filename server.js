@@ -69,7 +69,7 @@ app.use(session({
   cookie: { secure: true, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// 🌟 Global View Variables & Helpers Middleware
+// 🌟 Comprehensive Global View Variables & Helpers Middleware
 app.use((req, res, next) => {
   res.locals.title = 'Git Music Dashboard';
   res.locals.active = '';
@@ -86,6 +86,15 @@ app.use((req, res, next) => {
   res.locals.memory = { heapUsed: 0, heapTotal: 0, rss: 0 };
   res.locals.memMB = 0;
   res.locals.error = null;
+  res.locals.totalEvents = 0;
+  res.locals.todayCommands = 0;
+  res.locals.totalCommands = 0;
+  res.locals.uptime = 'N/A';
+  res.locals.uptimeSec = 0;
+  res.locals.channels = [];
+  res.locals.textChannels = [];
+  res.locals.voiceChannels = [];
+  res.locals.logs = [];
   
   // Template helpers
   res.locals.helpers = {
@@ -291,6 +300,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       memMB,
       todayCommands,
       totalCommands,
+      totalEvents: totalCommands,
       uptime,
       uptimeSec,
       ping,
@@ -415,16 +425,20 @@ app.get('/analytics', requireAuth, async (req, res) => {
     `).all();
 
     const totalRow = db.prepare("SELECT COUNT(*) as count FROM stats").get();
+    const totalCommands = totalRow ? totalRow.count : 0;
     const today = new Date().toISOString().split('T')[0];
     const todayRow = db.prepare("SELECT COUNT(*) as count FROM stats WHERE DATE(timestamp) = ?").get(today);
+    const todayCommands = todayRow ? todayRow.count : 0;
 
     res.render('analytics', {
       title: 'Analytics',
       dailyStats: JSON.stringify(dailyStats),
       topCommands: JSON.stringify(topCommands),
       hourlyStats: JSON.stringify(hourlyStats),
-      totalCommands: totalRow ? totalRow.count : 0,
-      todayCommands: todayRow ? todayRow.count : 0,
+      totalCommands,
+      totalEvents: totalCommands,
+      todayCommands,
+      error: null,
       active: 'analytics'
     });
   } catch (err) {
@@ -442,6 +456,7 @@ app.get('/logs', requireAuth, async (req, res) => {
     res.render('logs', {
       title: 'Logs',
       logs,
+      error: null,
       active: 'logs'
     });
   } catch (err) {
