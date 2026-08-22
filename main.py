@@ -112,13 +112,26 @@ class DspRequest(BaseModel):
     crossfader: Optional[int] = 0
     scratch_mode: Optional[bool] = False
 
+# Discord Bot Setup & Cog Loading
 if bot:
     @bot.event
     async def on_ready():
         try:
-            await bot.tree.sync()
-        except Exception:
-            pass
+            # Load the commands cog extension
+            await bot.load_extension("commands")
+            print("[SYSTEM] Loaded commands.py extension successfully.")
+        except Exception as e:
+            print(f"[ERROR] Failed to load commands extension: {e}")
+
+        try:
+            # INSTANT SYNC FOR YOUR SERVER: Replace YOUR_SERVER_ID with your actual server ID number
+            GUILD_ID = discord.Object(id=1491730170099273778)
+            bot.tree.copy_global_to(guild=GUILD_ID)
+            await bot.tree.sync(guild=GUILD_ID)
+            print(f"[SYSTEM] Slash commands synced instantly to server ID: {GUILD_ID.id}")
+        except Exception as e:
+            print(f"[ERROR] Failed to sync command tree: {e}")
+        
         print(f"[SYSTEM] Git Music Core live as {bot.user}")
 
 # API Routes
