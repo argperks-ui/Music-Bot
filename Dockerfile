@@ -1,22 +1,32 @@
-FROM node:20-slim
+FROM node:18-slim
 
-# Install Python and pip
-RUN apt-get update && apt-get install -y python3 python3-pip && rm -rf /var/lib/apt/lists/*
+# Install system dependencies for FFmpeg, Opus codec, and Python runtime
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    ffmpeg \
+    libopus0 \
+    libopus-dev \
+    libffi-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy package files and install Node dependencies
+# Copy and install Node.js dashboard dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm install --production
 
-# Copy Python requirements and install them
+# Copy and install Python bot dependencies
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Copy the rest of your app code
+# Copy project files
 COPY . .
 
-# Make start script executable
+# Grant execution permissions to launch script
 RUN chmod +x start.sh
+
+EXPOSE 3000
 
 CMD ["./start.sh"]
