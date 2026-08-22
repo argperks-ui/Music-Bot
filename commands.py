@@ -4,7 +4,7 @@ from discord.ext import commands
 import yt_dlp
 import asyncio
 
-# Configure yt-dlp to use cookies.txt for bot-wall bypass
+# Configure yt-dlp to use iOS/TV client fallback to bypass bot walls without cookies
 YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': True,
@@ -12,7 +12,11 @@ YDL_OPTIONS = {
     'quiet': True,
     'reconnect': '1',
     'reconnect_streamed': '1',
-    'cookiefile': 'cookies.txt',  # Automatically reads cookies from cookies.txt in root directory
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['ios', 'tv']
+        }
+    }
 }
 
 class MusicCommands(commands.Cog):
