@@ -5,15 +5,11 @@ from discord import app_commands
 from discord.ext import commands
 import yt_dlp
 from dotenv import load_dotenv
-import dashboard  # Keep your web dashboard running
-
-# Start the web dashboard server in the background
-dashboard.start_dashboard()
+import dashboard
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Setup bot intents
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
@@ -23,16 +19,19 @@ class MusicBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Sync slash commands with Discord globally
+        # Clear any old conflicting commands and sync globally
+        self.tree.clear_commands(guild=None)
         await self.tree.sync()
-        print("Slash commands synced successfully!")
+        print("Global slash commands synced cleanly!")
 
 bot = MusicBot()
 
-# Configure yt-dlp options
+# Start dashboard with bot instance reference
+dashboard.start_dashboard(bot)
+
 ytdl_format_options = {
     'format': 'bestaudio/best',
-    'noplaylist': False,
+    'noplaylist': True,
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
@@ -54,7 +53,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
         self.data = data
         self.title = data.get('title')
         self.url = data.get('url')
-        self.duration = data.get('duration', 0)
 
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=True):
@@ -66,23 +64,23 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
-# --- INTERACTIVE BUTTON CONTROLS (RYTHM STYLE) ---
+# Rythm-style interactive button control panel
 class MusicControlView(discord.ui.View):
-    def __init__(self, ctx_or_interaction):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.ctx = ctx_or_interaction
 
     @discord.ui.button(label="Pause/Resume", style=discord.ButtonStyle.primary, emoji="⏯️")
     async def pause_resume(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = interaction.guild.voice_client
         if not vc:
             return await interaction.response.send_message("❌ Bot is not connected.", ephemeral=True)
-        
         if vc.is_playing():
             vc.pause()
+            dashboard.add_log(f"Discord button: Paused music in {interaction.guild.name}")
             await interaction.response.send_message("⏸️ Paused the music.", ephemeral=True)
         elif vc.is_paused():
             vc.resume()
+            dashboard.add_log(f"Discord button: Resumed music in {interaction.guild.name}")
             await interaction.response.send_message("▶️ Resumed the music.", ephemeral=True)
         else:
             await interaction.response.send_message("❌ Nothing is playing.", ephemeral=True)
@@ -92,6 +90,7 @@ class MusicControlView(discord.ui.View):
         vc = interaction.guild.voice_client
         if vc and vc.is_playing():
             vc.stop()
+            dashboard.add_log(f"Discord button: Skipped track in {interaction.guild.name}")
             await interaction.response.send_message("⏭️ Skipped the song!", ephemeral=True)
         else:
             await interaction.response.send_message("❌ Nothing to skip.", ephemeral=True)
@@ -102,7 +101,8 @@ class MusicControlView(discord.ui.View):
         if vc:
             await vc.disconnect()
             dashboard.current_song = "None"
-            await interaction.response.send_message("⏹️ Stopped music and disconnected.", ephemeral=True)
+            dashboard.add_log(f"Discord button: Disconnected from {interaction.guild.name}")
+            await interaction.response.send_message("⏹️ Disconnected from the voice channel.", ephemeral=True)
         else:
             await interaction.response.send_message("❌ I'm not in a voice channel.", ephemeral=True)
 
@@ -110,14 +110,14 @@ class MusicControlView(discord.ui.View):
 async def on_ready():
     dashboard.bot_status = "Online"
     dashboard.guild_count = len(bot.guilds)
+    dashboard.add_log(f"Bot logged in successfully as {bot.user}")
     print(f'Logged in as {bot.user} successfully!')
-
-# --- SLASH COMMANDS ---
 
 @bot.tree.command(name="join", description="Make the bot join your voice channel")
 async def join(interaction: discord.Interaction):
+    await interaction.response.defer() # Prevents interaction timeout error
     if not interaction.user.voice:
-        return await interaction.response.send_message("❌ You need to be in a voice channel first!", ephemeral=True)
+        return await interaction.followup.send("❌ You need to be in a voice channel first!")
     
     channel = interaction.user.voice.channel
     if interaction.guild.voice_client:
@@ -125,15 +125,16 @@ async def join(interaction: discord.Interaction):
     else:
         await channel.connect()
     
-    await interaction.response.send_message(f'🔊 Joined **{channel.name}**!')
+    dashboard.add_log(f"Joined voice channel: {channel.name} in {interaction.guild.name}")
+    await interaction.followup.send(f'🔊 Joined **{channel.name}**!')
 
-@bot.tree.command(name="play", description="Play a song or YouTube search query")
-@app_commands.describe(query="The song name or YouTube link")
+@bot.tree.command(name="play", description="Play a song or search query")
+@app_commands.describe(query="Song name or YouTube link")
 async def play(interaction: discord.Interaction, query: str):
-    if not interaction.user.voice:
-        return await interaction.response.send_message("❌ You need to be in a voice channel first!", ephemeral=True)
+    await interaction.response.defer() # Prevents timeout error during extraction
 
-    await interaction.response.defer() # Lets Discord know we are processing
+    if not interaction.user.voice:
+        return await interaction.followup.send("❌ You need to be in a voice channel first!")
 
     vc = interaction.guild.voice_client
     if vc is None:
@@ -142,9 +143,10 @@ async def play(interaction: discord.Interaction, query: str):
     try:
         player = await YTDLSource.from_url(query, loop=bot.loop, stream=True)
         dashboard.current_song = player.title
+        dashboard.add_log(f"Now Playing: {player.title} ({interaction.guild.name})")
         
         if vc.is_playing() or vc.is_paused():
-            vc.stop() # Stop current track to play new one (or set up a queue later)
+            vc.stop()
             
         vc.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
         
@@ -155,59 +157,70 @@ async def play(interaction: discord.Interaction, query: str):
         )
         embed.set_footer(text=f"Requested by {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
         
-        await interaction.followup.send(embed=embed, view=MusicControlView(interaction))
+        await interaction.followup.send(embed=embed, view=MusicControlView())
     except Exception as e:
+        dashboard.add_log(f"Playback error: {e}")
         await interaction.followup.send(f"❌ Error playing song: `{e}`")
 
-@bot.tree.command(name="pause", description="Pause the currently playing song")
+@bot.tree.command(name="pause", description="Pause the current song")
 async def pause(interaction: discord.Interaction):
+    await interaction.response.defer()
     vc = interaction.guild.voice_client
     if vc and vc.is_playing():
         vc.pause()
-        await interaction.response.send_message("⏸️ Paused the music.")
+        dashboard.add_log("Paused playback via slash command.")
+        await interaction.followup.send("⏸️ Paused the music.")
     else:
-        await interaction.response.send_message("❌ Nothing is playing right now.", ephemeral=True)
+        await interaction.followup.send("❌ Nothing is playing right now.")
 
 @bot.tree.command(name="resume", description="Resume the paused song")
 async def resume(interaction: discord.Interaction):
+    await interaction.response.defer()
     vc = interaction.guild.voice_client
     if vc and vc.is_paused():
         vc.resume()
-        await interaction.response.send_message("▶️ Resumed the music.")
+        dashboard.add_log("Resumed playback via slash command.")
+        await interaction.followup.send("▶️ Resumed the music.")
     else:
-        await interaction.response.send_message("❌ The music is not paused.", ephemeral=True)
+        await interaction.followup.send("❌ The music is not paused.")
 
 @bot.tree.command(name="skip", description="Skip the current song")
 async def skip(interaction: discord.Interaction):
+    await interaction.response.defer()
     vc = interaction.guild.voice_client
     if vc and vc.is_playing():
         vc.stop()
-        await interaction.response.send_message("⏭️ Skipped the song!")
+        dashboard.add_log("Skipped track via slash command.")
+        await interaction.followup.send("⏭️ Skipped the song!")
     else:
-        await interaction.response.send_message("❌ Nothing to skip.", ephemeral=True)
+        await interaction.followup.send("❌ Nothing to skip.")
 
-@bot.tree.command(name="volume", description="Change the bot's volume (0 to 100)")
-@app_commands.describe(volume="Volume level from 0 to 100")
+@bot.tree.command(name="volume", description="Change audio output volume (0-100)")
+@app_commands.describe(volume="Volume percentage")
 async def volume(interaction: discord.Interaction, volume: int):
+    await interaction.response.defer()
     vc = interaction.guild.voice_client
     if not vc or not vc.is_playing():
-        return await interaction.response.send_message("❌ Nothing is playing right now.", ephemeral=True)
+        return await interaction.followup.send("❌ Nothing is playing right now.")
     
     if volume < 0 or volume > 100:
-        return await interaction.response.send_message("❌ Volume must be between 0 and 100.", ephemeral=True)
+        return await interaction.followup.send("❌ Volume must be between 0 and 100.")
     
     vc.source.volume = volume / 100.0
-    await interaction.response.send_message(f"🔊 Volume set to **{volume}%**")
+    dashboard.volume_level = volume
+    dashboard.add_log(f"Volume adjusted to {volume}% via slash command.")
+    await interaction.followup.send(f"🔊 Volume set to **{volume}%**")
 
-@bot.tree.command(name="stop", description="Stop the music and disconnect the bot")
+@bot.tree.command(name="stop", description="Stop music and disconnect")
 async def stop(interaction: discord.Interaction):
+    await interaction.response.defer()
     vc = interaction.guild.voice_client
     if vc:
         await vc.disconnect()
         dashboard.current_song = "None"
-        await interaction.response.send_message("⏹️ Disconnected from the voice channel.")
+        dashboard.add_log("Disconnected via slash command.")
+        await interaction.followup.send("⏹️ Disconnected from the voice channel.")
     else:
-        await interaction.response.send_message("❌ I'm not in a voice channel.", ephemeral=True)
+        await interaction.followup.send("❌ I'm not in a voice channel.")
 
-# Run the bot
 bot.run(TOKEN)
