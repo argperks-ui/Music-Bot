@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Git music // Audio Control Room</title>
+<style>
+:root {
+  --bg: #07090e;
+  --panel: #0f141d;
+  --panel2: #0b0e14;
+  --line: #1e293b;
+  --line-glow: #334155;
+  --text: #f1f5f9;
+  --muted: #64748b;
+  --gm-blue: #5865f2;
+  --gm-cyan: #00f2fe;
+  --gm-purple: #7928ca;
+  --gm-green: #10b981;
+  --gm-amber: #f59e0b;
+  --gm-red: #ef4444;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: radial-gradient(1100px 500px at 50% -15%, #1e1b4b 0%, transparent 70%), var(--bg);
+  color: var(--text);
+  font: 14px/1.5 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: transparent; }
+
+.shell { max-width: 1550px; margin: 0 auto; padding: 20px 24px 80px; }
+
+/* Top Navigation Header */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 900;
+  font-size: 19px;
+  letter-spacing: -.03em;
+  background: linear-gradient(135deg, #fff 40%, var(--gm-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brandmark {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--gm-purple), var(--gm-blue), var(--gm-cyan));
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 25px rgba(88, 101, 242, 0.45);
+  position: relative;
+  flex-none: true;
+}
+
+.brandmark svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #0f172a;
+  border: 1px solid var(--line);
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background: var(--gm-green);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--gm-green);
+}
+
+.top-actions { display: flex; align-items: center; gap: 12px; }
+
+.pill, .btn, select {
+  background: #131924;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 15px;
+  color: var(--text);
+  transition: all .2s ease;
+}
+
+.btn:hover { border-color: var(--gm-blue); background: #1a2334; transform: translateY(-1px); }
+.btn.primary {
+  background: linear-gradient(135deg, var(--gm-blue), var(--gm-purple));
+  border: none;
+  font-weight: 700;
+  box-shadow: 0 4px 20px rgba(88, 101, 242, 0.35);
+}
+.btn.primary:hover { box-shadow: 0 6px 24px rgba(88, 101, 242, 0.5); }
+
+/* Layout Grid */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.stack { display: flex; flex-direction: column; gap: 20px; }
+
+.panel {
+  background: linear-gradient(160deg, rgba(15, 20, 29, 0.95), rgba(11, 14, 20, 0.98));
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  font-size: 10px;
+  color: var(--gm-cyan);
+  font-weight: 800;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.badge {
+  display: inline-flex;
+  border: 1px solid rgba(88, 101, 242, 0.3);
+  border-radius: 99px;
+  padding: 4px 10px;
+  color: #a5b4fc;
+  font-size: 11px;
+  background: rgba(88, 101, 242, 0.08);
+  font-weight: 600;
+}
+
+/* Audio Player Section */
+.player { padding: 26px; }
+.player-main { display: flex; gap: 28px; align-items: center; }
+
+.cover-wrapper { position: relative; flex-none: true; }
+.cover {
+  width: 200px;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  object-fit: cover;
+  background: linear-gradient(135deg, #1e1b4b, var(--gm-purple), #0f172a);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: grid;
+  place-items: center;
+}
+.cover-icon { font-size: 54px; opacity: .8; filter: drop-shadow(0 0 15px rgba(0,242,254,0.5)); }
+
+.track { flex: 1; min-width: 0; }
+.track h1 {
+  font-size: clamp(26px, 3.5vw, 44px);
+  margin: 8px 0 4px;
+  letter-spacing: -.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+
+/* Equalizer Bars */
+.wave {
+  height: 70px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  margin: 18px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.bar {
+  flex: 1;
+  border-radius: 4px;
+  background: linear-gradient(to top, var(--gm-blue), var(--gm-cyan));
+  height: calc(12px + var(--h) * 0.5px);
+  transition: height .15s ease;
+}
+
+.bar.animating {
+  animation: eq 1.2s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -45ms);
+}
+
+@keyframes eq {
+  0% { height: 10px; opacity: .4; }
+  100% { height: calc(18px + var(--h) * 0.55px); opacity: 1; }
+}
+
+/* Scrub Bar */
+.progress-container { cursor: pointer; padding: 6px 0; }
+.progress {
+  height: 6px;
+  background: #1e293b;
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+}
+.progress-bar {
+  height: 100%;
+  width: 38%;
+  background: linear-gradient(90deg, var(--gm-purple), var(--gm-cyan));
+  border-radius: inherit;
+  box-shadow: 0 0 12px var(--gm-cyan);
+  transition: width .1s linear;
+}
+
+.time { display: flex; justify-content: space-between; font: 12px/1 ui-monospace, monospace; color: var(--muted); margin-top: 8px; }
+
+/* Player Controls */
+.controls { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 22px; }
+.icon-btn {
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  color: var(--muted);
+  padding: 10px;
+  border-radius: 50%;
+  transition: all .2s ease;
+  display: grid;
+  place-items: center;
+}
+.icon-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.icon-btn.active { color: var(--gm-cyan); text-shadow: 0 0 10px var(--gm-cyan); }
+
+.play-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--bg);
+  font-size: 20px;
+  font-weight: 900;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+  transition: all .2s ease;
+  display: grid;
+  place-items: center;
+}
+.play-btn:hover { transform: scale(1.08); box-shadow: 0 0 40px rgba(0, 242, 254, 0.6); }
+
+/* Grids & Panels */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+/* Queue */
+.queue { padding: 4px 0; max-height: 280px; overflow-y: auto; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background .15s ease;
+}
+.row:hover { background: rgba(255, 255, 255, 0.02); }
+.row:last-child { border: 0; }
+
+.thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1e293b, var(--gm-blue));
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  flex-none: true;
+}
+
+.row-info { flex: 1; min-width: 0; }
+.row-info strong, .row-info span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-info span { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.remove-btn { color: var(--muted); font-size: 16px; padding: 6px; border-radius: 6px; }
+.remove-btn:hover { color: var(--gm-red); background: rgba(239, 68, 68, 0.1); }
+
+/* Audio Lab Metrics */
+.metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 18px; }
+.metric {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.metric:hover { border-color: var(--gm-blue); }
+.metric b { font: 22px ui-monospace, monospace; color: var(--text); }
+.metric small { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
+
+/* Settings Form */
+.settings { padding: 20px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field label { font-size: 12px; font-weight: 700; color: #cbd5e1; }
+.field span { font-size: 11px; color: var(--muted); }
+.field select { width: 100%; padding: 10px; background: var(--panel2); border-color: var(--line); }
+
+.access {
+  background: rgba(88, 101, 242, 0.04);
+  border: 1px solid rgba(88, 101, 242, 0.25);
+  border-radius: 14px;
+  padding: 14px;
+  margin: 16px 0;
+}
+.access h3 { font-size: 12px; margin: 0 0 10px; color: #a5b4fc; }
+.access-row { display: flex; justify-content: space-between; padding: 7px 0; border-top: 1px solid rgba(88, 101, 242, 0.12); font-size: 12px; }
+.ok { color: var(--gm-green); font-weight: 600; }
+.blocked { color: var(--gm-red); font-weight: 600; }
+
+/* Custom Switch Toggle */
+.toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 0;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.toggle b { display: block; font-size: 12px; color: #e2e8f0; }
+.toggle span span { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+.switch {
+  width: 42px;
+  height: 24px;
+  border-radius: 99px;
+  background: #1e293b;
+  padding: 3px;
+  flex-none: true;
+  transition: background .2s ease;
+}
+.switch i {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #94a3b8;
+  transition: transform .2s ease, background .2s ease;
+}
+.toggle.on .switch { background: var(--gm-blue); }
+.toggle.on .switch i { transform: translateX(18px); background: #ffffff; }
+
+/* Sidebar Server Switcher */
+.servers { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.server {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: all .2s ease;
+}
+.server:hover { background: rgba(255,255,255,0.03); }
+.server.active { background: rgba(88, 101, 242, 0.12); border-color: rgba(88, 101, 242, 0.4); }
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #1e293b;
+  color: #a5b4fc;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  flex-none: true;
+}
+.server div { flex: 1; min-width: 0; }
+.server strong { display: block; font-size: 13px; }
+.server span { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* Audit Stream */
+.audit-list { max-height: 200px; overflow-y: auto; }
+
+/* Toast Notifications */
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  background: #0f172a;
+  border: 1px solid var(--gm-blue);
+  border-radius: 12px;
+  padding: 14px 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  transform: translateY(120px);
+  opacity: 0;
+  transition: all .3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1000;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+.admin-note {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #94a3b8;
+  font-size: 11px;
+}
+.admin-note b { color: var(--gm-green); }
+
+@media(max-width: 1024px) {
+  .layout { grid-template-columns: 1fr; }
+  .grid2 { grid-template-columns: 1fr; }
+}
+@media(max-width: 680px) {
+  .shell { padding: 15px; }
+  .player-main { flex-direction: column; text-align: center; }
+  .cover { width: 100%; max-width: 240px; margin: 0 auto; }
+  .controls { gap: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Top Navigation Bar -->
+  <header class="top">
+    <div class="brand">
+      <div class="brandmark">
+        <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12 0a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </div>
+      GIT MUSIC <span style="color: var(--muted); font-weight: 400; font-size: 14px;">// CONTROL ROOM</span>
+    </div>
+    <div class="top-actions">
+      <div class="status-badge"><i class="dot"></i> Engine Online</div>
+      <button class="pill">Bot Owner ▾</button>
+    </div>
+  </header>
+
+  <!-- Main Grid Dashboard -->
+  <main class="layout">
+    <div class="stack">
+      
+      <!-- Live Player Control Engine -->
+      <section class="panel player">
+        <div class="eyebrow" id="guildHeader">Live audio engine · Main Discord Server</div>
+        <div class="player-main">
+          <div class="cover-wrapper">
+            <div class="cover">
+              <span class="cover-icon">🎵</span>
+            </div>
+          </div>
+          <div class="track">
+            <span class="badge" id="qualityBadge">FLAC 24-bit / 96kHz</span>
+            <h1 id="trackTitle">Git Music Track</h1>
+            <p id="trackMeta">Git Music Engine · requested by @admin</p>
+            
+            <div class="wave" id="wave"></div>
+            
+            <div class="progress-container" onclick="seekTrack(event)">
+              <div class="progress">
+                <div class="progress-bar" id="progressBar"></div>
+              </div>
+            </div>
+            <div class="time">
+              <span id="currentTime">1:42</span>
+              <span id="totalTime">4:20</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="icon-btn" id="shuffleBtn" title="Shuffle Queue" onclick="sendAction('shuffle')">⤨</button>
+          <button class="icon-btn" title="Previous Track" onclick="toast('Previous track requested')">◀◀</button>
+          <button class="play-btn" id="playBtn" onclick="sendAction('toggle_play')">Ⅱ</button>
+          <button class="icon-btn" title="Skip Track" onclick="sendAction('skip')">▶▶</button>
+          <button class="icon-btn" id="loopBtn" title="Loop Mode" onclick="toggleLoop()">↻</button>
+        </div>
+      </section>
+
+      <div class="grid2">
+        <!-- Up Next Playback Queue -->
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Playback queue</div>
+              <strong>Up next</strong>
+            </div>
+            <button class="btn" onclick="sendAction('shuffle')">Shuffle</button>
+          </div>
+          <div class="queue" id="queue"></div>
+        </section>
+
+        <!-- Audio Lab / Equalizer Settings -->
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Audio lab</div>
+              <strong>Equalizer presets</strong>
+            </div>
+            <span class="badge">5 Band DSP</span>
+          </div>
+          <div class="settings">
+            <div class="metric-grid">
+              <div class="metric" onclick="toast('Bass boost active')">
+                <b id="bassMetric">+4.2 dB</b>
+                <small>Bass boost</small>
+              </div>
+              <div class="metric" onclick="toast('Sample rate locked')">
+                <b id="sampleMetric">96kHz</b>
+                <small>Sample rate</small>
+              </div>
+              <div class="metric" onclick="toast('Latency within threshold')">
+                <b id="latencyMetric">38ms</b>
+                <small>Command latency</small>
+              </div>
+              <div class="metric" onclick="toast('Voice connection crystal clear')">
+                <b>99.4%</b>
+                <small>Voice quality</small>
+              </div>
+            </div>
+            <div class="field" style="margin-top: 10px;">
+              <label>DSP Preset</label>
+              <select id="presetSelect" onchange="applyPreset(this.value)">
+                <option value="Night Drive">Night Drive (Enhanced Bass)</option>
+                <option value="Vocal Clarity">Vocal Clarity</option>
+                <option value="Flat Studio">Flat Studio Reference</option>
+                <option value="Cyberpunk Synth">Cyberpunk Synth Boost</option>
+              </select>
+            </div>
+            <button class="btn primary" style="width:100%; margin-top:8px;" onclick="toast('Equalizer preset applied!')">Apply Audio DSP</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Server Command Center & Privileged Controls -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Privileged controls</div>
+            <strong>Server command center</strong>
+          </div>
+          <span class="badge">Owner + Staff</span>
+        </div>
+        <div class="settings">
+          <div class="admin-note">
+            <b>Access model:</b> Server owners hold master permissions. Discord Administrators are controlled via the policy toggle below.
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label>Active server <span>Target server for configuration updates.</span></label>
+            <select id="serverSelect" onchange="changeServer(this.value)">
+              <option value="main">Main Discord Server</option>
+              <option value="test">Testing Ground</option>
+              <option value="vip">VIP Lounge</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>DJ Role <span>Members with this role manage queue actions.</span></label>
+            <select id="djRole">
+              <option value="DJ">DJ</option>
+              <option value="Music Master">Music Master</option>
+              <option value="Moderator">Moderator</option>
+              <option value="VIP">VIP</option>
+              <option value="Event Host">Event Host</option>
+            </select>
+          </div>
+
+          <div class="access">
+            <h3>Who can edit settings?</h3>
+            <div class="access-row"><span>Server Owner</span><b class="ok">Always allowed</b></div>
+            <div class="access-row"><span>Bot Staff</span><b class="ok">Global access</b></div>
+            <div class="access-row"><span>Discord Administrator</span><b id="adminStatus" class="ok">Allowed</b></div>
+          </div>
+
+          <button class="toggle on" id="adminToggle" onclick="togglePolicyUI('admin')">
+            <span>
+              <b>Allow Discord Administrators</b>
+              <span>Grant server admins access to modify playback settings.</span>
+            </span>
+            <i class="switch"><i></i></i>
+          </button>
+
+          <button class="toggle on" id="skipToggle" onclick="togglePolicyUI('skip')">
+            <span>
+              <b>Require DJ role for skip</b>
+              <span>Protect queue controls against non-privileged members.</span>
+            </span>
+            <i class="switch"><i></i></i>
+          </button>
+
+          <button class="toggle on" id="announceToggle" onclick="togglePolicyUI('announce')">
+            <span>
+              <b>Announce track changes</b>
+              <span>Broadcast now-playing notices in the server voice channel.</span>
+            </span>
+            <i class="switch"><i></i></i>
+          </button>
+
+          <button class="btn primary" style="width:100%; margin-top: 14px;" onclick="savePolicy()">Save Server Policy</button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Right Sidebar -->
+    <aside class="stack">
+      <!-- Connected Guild Switcher -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Connected guilds</div>
+            <strong>Server switcher</strong>
+          </div>
+          <span class="muted" style="font-size:12px;">3 online</span>
+        </div>
+        <div class="servers">
+          <button class="server active" id="server-btn-main" onclick="pickServer('main', 'Main Discord Server')">
+            <i class="avatar">GM</i>
+            <div>
+              <strong>Main Discord Server</strong>
+              <span>12.4k members · playing</span>
+            </div>
+            <b style="color:var(--gm-green)">✓</b>
+          </button>
+          <button class="server" id="server-btn-test" onclick="pickServer('test', 'Testing Ground')">
+            <i class="avatar">TG</i>
+            <div>
+              <strong>Testing Ground</strong>
+              <span>842 members · idle</span>
+            </div>
+          </button>
+          <button class="server" id="server-btn-vip" onclick="pickServer('vip', 'VIP Lounge')">
+            <i class="avatar">VL</i>
+            <div>
+              <strong>VIP Lounge</strong>
+              <span>3.1k members · playing</span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- Telemetry Stats -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Voice telemetry</div>
+            <strong>Live operations</strong>
+          </div>
+          <span class="ok">● LIVE</span>
+        </div>
+        <div class="metric-grid">
+          <div class="metric"><b>08</b><small>Voice sessions</small></div>
+          <div class="metric"><b>12</b><small>Managed servers</small></div>
+          <div class="metric"><b>1,420</b><small>Audit events</small></div>
+          <div class="metric"><b>99.99%</b><small>Uptime</small></div>
+        </div>
+      </section>
+
+      <!-- Audit Stream -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Staff activity</div>
+            <strong>Audit stream</strong>
+          </div>
+        </div>
+        <div class="queue audit-list" id="auditStream">
+          <div class="row">
+            <i class="avatar">GM</i>
+            <div class="row-info">
+              <strong>System initialized</strong>
+              <span>Git music Engine v2.4</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<!-- Toast Popup Container -->
+<div id="toast" class="toast"></div>
+
+<script>
+// State Management
+let currentGuild = 'main';
+let isLooping = false;
+let currentTimeSec = 102;
+let totalTimeSec = 260;
+
+let state = {
+  policy: { role: 'DJ', admin: true, skip: true, announce: true },
+  player: {
+    playing: true,
+    current_track: { title: "Git Music Track", artist: "Git Music Engine", requested_by: "@admin" },
+    queue: [
+      { title: "Synthwave Drift", artist: "Midnight Circuit", requested_by: "@lena" },
+      { title: "Cyberpunk Beats Vol 3", artist: "District 9", requested_by: "@ravi" },
+      { title: "Low-Fi Chill Beats", artist: "Cozy Static", requested_by: "@mira" },
+      { title: "Aurora Protocol", artist: "Git Music", requested_by: "@theo" }
+    ]
+  }
+};
+
+// Sync State with Backend API
+async function syncState() {
+  try {
+    const res = await fetch(`/api/state/${currentGuild}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.policy) state.policy = data.policy;
+      if (data.player) state.player = data.player;
+    }
+  } catch (err) {
+    // Offline preview mode fallback
+  }
+  renderUI();
+}
+
+// Render Dashboard Elements
+function renderUI() {
+  // Update Player UI
+  const p = state.player;
+  if (p.current_track) {
+    document.getElementById('trackTitle').textContent = p.current_track.title || 'Git Music Track';
+    document.getElementById('trackMeta').textContent = `${p.current_track.artist || 'Git Music Engine'} · requested by ${p.current_track.requested_by || '@admin'}`;
+  }
+  
+  const playBtn = document.getElementById('playBtn');
+  playBtn.textContent = p.playing ? 'Ⅱ' : '▶';
+  
+  // Waveform Animation State
+  document.querySelectorAll('.bar').forEach(bar => {
+    if (p.playing) bar.classList.add('animating');
+    else bar.classList.remove('animating');
+  });
+
+  // Render Queue
+  const queueEl = document.getElementById('queue');
+  if (p.queue && p.queue.length > 0) {
+    queueEl.innerHTML = p.queue.map((t, idx) => `
+      <div class="row">
+        <div class="thumb">🎵</div>
+        <div class="row-info">
+          <strong>${t.title}</strong>
+          <span>${t.artist} · ${t.requested_by}</span>
+        </div>
+        <button class="remove-btn" title="Remove track" onclick="removeQueueTrack(${idx})">✕</button>
+      </div>
+    `).join('');
+  } else {
+    queueEl.innerHTML = `<div class="row"><div class="row-info"><span>Queue is empty</span></div></div>`;
+  }
+
+  // Render Policy Options
+  const pol = state.policy;
+  document.getElementById('djRole').value = pol.role || 'DJ';
+  
+  const adminToggle = document.getElementById('adminToggle');
+  const adminStatus = document.getElementById('adminStatus');
+  adminToggle.classList.toggle('on', !!pol.admin);
+  adminStatus.textContent = pol.admin ? 'Allowed' : 'Blocked';
+  adminStatus.className = pol.admin ? 'ok' : 'blocked';
+
+  document.getElementById('skipToggle').classList.toggle('on', !!pol.skip);
+  document.getElementById('announceToggle').classList.toggle('on', !!pol.announce);
+}
+
+// Player API Calls
+async function sendAction(action) {
+  try {
+    const res = await fetch(`/api/player/${currentGuild}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      state.player = data.player;
+    } else {
+      fallbackAction(action);
+    }
+  } catch (e) {
+    fallbackAction(action);
+  }
+  renderUI();
+  logAudit(`Player Action: ${action}`);
+  toast(`Action executed: ${action.replace('_', ' ')}`);
+}
+
+function fallbackAction(action) {
+  if (action === 'toggle_play') state.player.playing = !state.player.playing;
+  else if (action === 'skip' && state.player.queue.length) {
+    state.player.current_track = state.player.queue.shift();
+    currentTimeSec = 0;
+  } else if (action === 'shuffle') {
+    state.player.queue.sort(() => Math.random() - 0.5);
+  }
+}
+
+function removeQueueTrack(index) {
+  const removed = state.player.queue.splice(index, 1);
+  renderUI();
+  toast(`Removed track from queue`);
+  if (removed.length) logAudit(`Removed track: ${removed[0].title}`);
+}
+
+// Policy Management & API Save
+async function savePolicy() {
+  const payload = {
+    role: document.getElementById('djRole').value,
+    admin: document.getElementById('adminToggle').classList.contains('on'),
+    skip: document.getElementById('skipToggle').classList.contains('on'),
+    announce: document.getElementById('announceToggle').classList.contains('on')
+  };
+
+  state.policy = payload;
+
+  try {
+    await fetch(`/api/policy/${currentGuild}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {}
+
+  renderUI();
+  logAudit(`Policy updated for ${currentGuild}`);
+  toast('Server policy saved successfully!');
+}
+
+function togglePolicyUI(key) {
+  if (key === 'admin') {
+    const el = document.getElementById('adminToggle');
+    el.classList.toggle('on');
+    state.policy.admin = el.classList.contains('on');
+  } else if (key === 'skip') {
+    const el = document.getElementById('skipToggle');
+    el.classList.toggle('on');
+    state.policy.skip = el.classList.contains('on');
+  } else if (key === 'announce') {
+    const el = document.getElementById('announceToggle');
+    el.classList.toggle('on');
+    state.policy.announce = el.classList.contains('on');
+  }
+  savePolicy();
+}
+
+// UI Interactive Handlers
+function changeServer(val) {
+  currentGuild = val;
+  document.getElementById('guildHeader').textContent = `Live audio engine · ${val.toUpperCase()} Server`;
+  
+  document.querySelectorAll('.server').forEach(el => el.classList.remove('active'));
+  const btn = document.getElementById(`server-btn-${val}`);
+  if (btn) btn.classList.add('active');
+
+  syncState();
+  toast(`Loaded configuration for ${val}`);
+}
+
+function pickServer(guildKey, serverName) {
+  document.getElementById('serverSelect').value = guildKey;
+  changeServer(guildKey);
+}
+
+function toggleLoop() {
+  isLooping = !isLooping;
+  const loopBtn = document.getElementById('loopBtn');
+  loopBtn.classList.toggle('active', isLooping);
+  toast(isLooping ? 'Loop mode: current track' : 'Loop mode: disabled');
+}
+
+function applyPreset(presetName) {
+  if (presetName === 'Night Drive') {
+    document.getElementById('bassMetric').textContent = '+5.8 dB';
+    document.getElementById('qualityBadge').textContent = 'FLAC 24-bit / 96kHz';
+  } else if (presetName === 'Vocal Clarity') {
+    document.getElementById('bassMetric').textContent = '+1.2 dB';
+    document.getElementById('qualityBadge').textContent = 'DSP Studio / 48kHz';
+  } else {
+    document.getElementById('bassMetric').textContent = '+0.0 dB';
+    document.getElementById('qualityBadge').textContent = 'HQ 320kbps';
+  }
+  toast(`Applied DSP preset: ${presetName}`);
+  logAudit(`Audio preset changed: ${presetName}`);
+}
+
+function seekTrack(event) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const clickX = event.clientX - rect.left;
+  const percentage = clickX / rect.width;
+  currentTimeSec = Math.floor(totalTimeSec * percentage);
+  updateTimerUI();
+  toast('Playback position updated');
+}
+
+function updateTimerUI() {
+  const formatTime = s => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  document.getElementById('currentTime').textContent = formatTime(currentTimeSec);
+  document.getElementById('totalTime').textContent = formatTime(totalTimeSec);
+  document.getElementById('progressBar').style.width = `${(currentTimeSec / totalTimeSec) * 100}%`;
+}
+
+function logAudit(eventText) {
+  const stream = document.getElementById('auditStream');
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `
+    <i class="avatar">GM</i>
+    <div class="row-info">
+      <strong>${eventText}</strong>
+      <span>${currentGuild.toUpperCase()} · Just now</span>
+    </div>
+  `;
+  stream.insertBefore(row, stream.firstChild);
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(window.tt);
+  window.tt = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// Initialization
+document.addEventListener('DOMContentLoaded', () => {
+  // Generate visualizer waveform bars
+  const wave = document.getElementById('wave');
+  wave.innerHTML = Array.from({ length: 48 }, (_, i) =>
+    `<i class="bar animating" style="--i:${i};--h:${15 + Math.random() * 70}"></i>`
+  ).join('');
+
+  syncState();
+  setInterval(syncState, 4000); // Polling sync loop
+
+  // Playhead progress timer
+  setInterval(() => {
+    if (state.player.playing && currentTimeSec < totalTimeSec) {
+      currentTimeSec++;
+      updateTimerUI();
+    }
+  }, 1000);
+});
+</script>
+</body>
+</html>
