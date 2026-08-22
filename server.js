@@ -71,6 +71,11 @@ app.use((req, res, next) => {
   res.locals.active = '';
   res.locals.user = req.session.user || null;
   res.locals.hbOnline = true;
+  res.locals.bot = null;
+  res.locals.guilds = [];
+  res.locals.voice = 0;
+  res.locals.apiLatency = 0;
+  res.locals.heartbeat = { voiceCount: 0, ping: 0 };
   
   const clientId = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
   res.locals.INVITE = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`;
@@ -231,7 +236,8 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       totalMembers,
       voiceConnections,
       voice: voiceConnections,
-      heartbeat: { voiceCount: voiceConnections },
+      heartbeat: { voiceCount: voiceConnections, ping: ping },
+      apiLatency: ping,
       todayCommands,
       totalCommands,
       uptime,
