@@ -63,6 +63,15 @@ app.use(session({
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
+
+// 🌟 Global View Variables Middleware (Prevents "is not defined" errors permanently)
+app.use((req, res, next) => {
+  res.locals.title = 'Git Music Dashboard';
+  res.locals.active = '';
+  res.locals.user = req.session.user || null;
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -222,7 +231,6 @@ app.get('/dashboard', requireAuth, async (req, res) => {
 
     res.render('dashboard', {
       title: 'Dashboard',
-      user: req.session.user,
       botUser,
       totalGuilds,
       totalMembers,
@@ -231,7 +239,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       totalCommands,
       uptime,
       ping,
-      activePage: 'dashboard'
+      active: 'dashboard'
     });
   } catch (err) {
     console.error('Dashboard error:', err);
@@ -259,9 +267,8 @@ app.get('/guilds', requireAuth, async (req, res) => {
 
     res.render('guilds', {
       title: 'Servers',
-      user: req.session.user,
       guilds: enriched,
-      activePage: 'guilds'
+      active: 'guilds'
     });
   } catch (err) {
     console.error('Guilds error:', err);
@@ -291,13 +298,12 @@ app.get('/guild/:id', requireAuth, async (req, res) => {
 
     res.render('guild', {
       title: 'Guild Settings',
-      user: req.session.user,
       guild,
       channels: channels.filter(c => c.type === 0 || c.type === 2 || c.type === 5), // text, voice, announcement
       textChannels: channels.filter(c => c.type === 0 || c.type === 5),
       voiceChannels: channels.filter(c => c.type === 2),
       settings: settings || defaultSettings,
-      activePage: 'guilds'
+      active: 'guilds'
     });
   } catch (err) {
     console.error('Guild detail error:', err);
@@ -365,13 +371,12 @@ app.get('/analytics', requireAuth, async (req, res) => {
 
     res.render('analytics', {
       title: 'Analytics',
-      user: req.session.user,
       dailyStats: JSON.stringify(dailyStats),
       topCommands: JSON.stringify(topCommands),
       hourlyStats: JSON.stringify(hourlyStats),
       totalCommands: totalRow ? totalRow.count : 0,
       todayCommands: todayRow ? todayRow.count : 0,
-      activePage: 'analytics'
+      active: 'analytics'
     });
   } catch (err) {
     console.error('Analytics error:', err);
@@ -388,9 +393,8 @@ app.get('/logs', requireAuth, async (req, res) => {
     
     res.render('logs', {
       title: 'Logs',
-      user: req.session.user,
       logs,
-      activePage: 'logs'
+      active: 'logs'
     });
   } catch (err) {
     console.error('Logs error:', err);
