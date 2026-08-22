@@ -64,11 +64,16 @@ app.use(session({
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// 🌟 Global View Variables Middleware (Prevents "is not defined" errors permanently)
+// 🌟 Global View Variables Middleware (Prevents missing variable errors permanently)
 app.use((req, res, next) => {
   res.locals.title = 'Git Music Dashboard';
   res.locals.active = '';
   res.locals.user = req.session.user || null;
+  res.locals.hbOnline = true;
+  
+  const clientId = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
+  res.locals.INVITE = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`;
+  
   next();
 });
 
