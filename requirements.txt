@@ -1,3 +1,4 @@
 discord.py
 yt-dlp>=2024.3.10
 PyNaCl
+python-dotenv
