@@ -10,7 +10,7 @@ RUN npm install
 COPY Git-Music-Dashboard/ ./
 RUN npm run build
 
-# Stage 2: Python Runtime & Bot Setup
+# Stage 2: Python Runtime & Bot Server
 FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,11 +22,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy compiled static export from Stage 1
-COPY --from=frontend-builder /app/Git-Music-Dashboard/out ./Git-Music-Dashboard/out
-
-# Copy project files
+# 1. Copy repository source code FIRST
 COPY . .
+
+# 2. Copy compiled static frontend AFTER so COPY . . cannot overwrite it
+COPY --from=frontend-builder /app/Git-Music-Dashboard/out ./Git-Music-Dashboard/out
 
 ENV PORT=3000
 EXPOSE 3000
