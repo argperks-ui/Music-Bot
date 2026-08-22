@@ -1,207 +1,125 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
 import yt_dlp
 import asyncio
 
-# Safe logging fallback so the bot never crashes if dashboard changes
-try:
-    import dashboard
-except ImportError:
-    class DummyDashboard:
-        current_song = "None"
-        volume_level = 50
-        def add_log(self, msg): print(f"[Log]: {msg}")
-    dashboard = DummyDashboard()
-
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0'
+# YTDLP Options for fast searching and audio extraction
+YDL_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': 'True'}
+FFMPEG_OPTIONS = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    'options': '-vn'
 }
 
-ffmpeg_options = {
-    'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
-}
+ytdl = yt_dlp.YoutubeDL(YDL_OPTIONS)
 
-ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
-
-class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
-        self.data = data
-        self.title = data.get('title')
-        self.url = data.get('url')
-
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=True):
-        loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        if 'entries' in data:
-            data = data['entries'][0]
-        
-        filename = data['url'] if stream else ytdl.prepare_filename(data)
-        return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
-
-class MusicControlView(discord.ui.View):
-    def __init__(self):
+class MusicControllerView(discord.ui.View):
+    def __init__(self, bot, ctx_or_interaction):
         super().__init__(timeout=None)
+        self.bot = bot
 
     @discord.ui.button(label="Pause/Resume", style=discord.ButtonStyle.primary, emoji="⏯️")
     async def pause_resume(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = interaction.guild.voice_client
         if not vc:
-            return await interaction.response.send_message("❌ Bot is not connected.", ephemeral=True)
+            return await interaction.response.send_message("Bot is not in a voice channel!", ephemeral=True)
+        
         if vc.is_playing():
             vc.pause()
-            await interaction.response.send_message("⏸️ Paused the music.", ephemeral=True)
+            await interaction.response.send_message("⏸️ Music paused.", ephemeral=True)
         elif vc.is_paused():
             vc.resume()
-            await interaction.response.send_message("▶️ Resumed the music.", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Nothing is playing.", ephemeral=True)
+            await interaction.response.send_message("▶️ Music resumed.", ephemeral=True)
 
     @discord.ui.button(label="Skip", style=discord.ButtonStyle.secondary, emoji="⏭️")
-    async def skip(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def skip_song(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = interaction.guild.voice_client
         if vc and vc.is_playing():
             vc.stop()
-            await interaction.response.send_message("⏭️ Skipped the song!", ephemeral=True)
+            await interaction.response.send_message("⏭️ Skipped current track.", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ Nothing to skip.", ephemeral=True)
+            await interaction.response.send_message("No audio currently playing.", ephemeral=True)
 
-    @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger, emoji="⏹️")
-    async def stop(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="Stop & Disconnect", style=discord.ButtonStyle.danger, emoji="⏹️")
+    async def stop_bot(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = interaction.guild.voice_client
         if vc:
             await vc.disconnect()
-            await interaction.response.send_message("⏹️ Disconnected from the voice channel.", ephemeral=True)
+            await interaction.response.send_message("⏹️ Stopped playback and disconnected from voice.", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ I'm not in a voice channel.", ephemeral=True)
+            await interaction.response.send_message("Bot is not connected to any voice channel.", ephemeral=True)
 
-class MusicCommands(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-
-    @app_commands.command(name="join", description="Make the bot join your voice channel")
-    async def join(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ You need to be in a voice channel first!")
+async def setup_music_commands(bot):
+    
+    @bot.tree.command(name="join", description="Make the bot join your current voice channel.")
+    async def join(interaction: discord.Interaction):
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            return await interaction.response.send_message("❌ You must be connected to a voice channel first!", ephemeral=True)
         
         channel = interaction.user.voice.channel
         if interaction.guild.voice_client:
             await interaction.guild.voice_client.move_to(channel)
         else:
             await channel.connect()
-        
-        await interaction.followup.send(f'🔊 Joined **{channel.name}**!')
+            
+        await interaction.response.send_message(f"✅ Joined **{channel.name}**!", ephemeral=True)
 
-    @app_commands.command(name="play", description="Play a song or search query")
-    @app_commands.describe(query="Song name or YouTube link")
-    async def play(self, interaction: discord.Interaction, query: str):
+    @bot.tree.command(name="play", description="Search YouTube/Spotify and play a song.")
+    @app_commands.describe(search="Song name, keywords, or URL")
+    async def play(interaction: discord.Interaction, search: str):
         await interaction.response.defer()
 
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ You need to be in a voice channel first!")
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            return await interaction.followup.send("❌ You need to be in a voice channel to play music!", ephemeral=True)
 
+        channel = interaction.user.voice.channel
         vc = interaction.guild.voice_client
-        if vc is None:
-            vc = await interaction.user.voice.channel.connect()
+        if not vc:
+            vc = await channel.connect()
+        elif vc.channel != channel:
+            await vc.move_to(channel)
 
+        # Search logic using yt-dlp
+        loop = asyncio.get_running_loop()
         try:
-            player = await asyncio.wait_for(
-                YTDLSource.from_url(query, loop=self.bot.loop, stream=True),
-                timeout=10.0
-            )
+            query = search if search.startswith("http") else f"ytsearch:{search}"
+            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(query, download=False))
             
-            try:
-                dashboard.current_song = player.title
-            except AttributeError:
-                pass
+            if 'entries' in data:
+                # Take the first search result
+                info = data['entries'][0]
+            else:
+                info = data
 
-            if vc.is_playing() or vc.is_paused():
+            audio_url = info.get('url')
+            title = info.get('title', 'Unknown Titleuploader')
+            artist = info.get('uploader', 'Unknown Artist')
+            duration = info.get('duration_string', 'Live')
+            thumbnail = info.get('thumbnail', 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4')
+
+            source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
+
+            def after_playing(error):
+                if error:
+                    print(f"Player error: {error}")
+
+            if vc.is_playing():
                 vc.stop()
-                
-            vc.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
-            
+
+            vc.play(source, after=after_playing)
+
+            # Build a gorgeous embedded control card
             embed = discord.Embed(
-                title="🎵 Now Playing",
-                description=f"**[{player.title}]({player.url})**",
-                color=discord.Color.blurple()
+                title="🎶 Now Playing",
+                description=f"**[{title}]({info.get('webpage_url', '#')})**",
+                color=0x8b5cf6
             )
-            embed.set_footer(text=f"Requested by {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
-            
-            await interaction.followup.send(embed=embed, view=MusicControlView())
-            
-        except asyncio.TimeoutError:
-            await interaction.followup.send("❌ **Request timed out!** YouTube took too long to respond.")
+            embed.add_field(name="Artist / Uploader", value=artist, inline=True)
+            embed.add_field(name="Duration", value=duration, inline=True)
+            embed.set_thumbnail(url=thumbnail)
+            embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
+
+            view = MusicControllerView(bot, interaction)
+            await interaction.followup.send(embed=embed, view=view)
+
         except Exception as e:
-            await interaction.followup.send(f"❌ Error playing song: `{e}`")
-
-    @app_commands.command(name="pause", description="Pause the current song")
-    async def pause(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        vc = interaction.guild.voice_client
-        if vc and vc.is_playing():
-            vc.pause()
-            await interaction.followup.send("⏸️ Paused the music.")
-        else:
-            await interaction.followup.send("❌ Nothing is playing right now.")
-
-    @app_commands.command(name="resume", description="Resume the paused song")
-    async def resume(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        vc = interaction.guild.voice_client
-        if vc and vc.is_paused():
-            vc.resume()
-            await interaction.followup.send("▶️ Resumed the music.")
-        else:
-            await interaction.followup.send("❌ The music is not paused.")
-
-    @app_commands.command(name="skip", description="Skip the current song")
-    async def skip(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        vc = interaction.guild.voice_client
-        if vc and vc.is_playing():
-            vc.stop()
-            await interaction.followup.send("⏭️ Skipped the song!")
-        else:
-            await interaction.followup.send("❌ Nothing to skip.")
-
-    @app_commands.command(name="volume", description="Change audio output volume (0-100)")
-    @app_commands.describe(volume="Volume percentage")
-    async def volume(self, interaction: discord.Interaction, volume: int):
-        await interaction.response.defer()
-        vc = interaction.guild.voice_client
-        if not vc or not vc.is_playing():
-            return await interaction.followup.send("❌ Nothing is playing right now.")
-        
-        if volume < 0 or volume > 100:
-            return await interaction.followup.send("❌ Volume must be between 0 and 100.")
-        
-        vc.source.volume = volume / 100.0
-        await interaction.followup.send(f"🔊 Volume set to **{volume}%**")
-
-    @app_commands.command(name="stop", description="Stop music and disconnect")
-    async def stop(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        vc = interaction.guild.voice_client
-        if vc:
-            await vc.disconnect()
-            try:
-                dashboard.current_song = "None"
-            except AttributeError:
-                pass
-            await interaction.followup.send("⏹️ Disconnected from the voice channel.")
-        else:
-            await interaction.followup.send("❌ I'm not in a voice channel.")
-
-async def setup(bot):
-    await bot.add_cog(MusicCommands(bot))
+            await interaction.followup.send(f"❌ Error processing search: `{str(e)}`", ephemeral=True)

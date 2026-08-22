@@ -57,14 +57,14 @@
       <div class="page-header">
         <div>
           <h1>Dashboard Overview</h1>
-          <p>Monitor your bot performance and active nodes in real time.</p>
+          <p>Manage audio playback and bot voice states in real time.</p>
         </div>
         <div class="header-time">
           <i class="fa-solid fa-circle-dot" style="color: var(--success);"></i> Bot Online
         </div>
       </div>
 
-      <!-- Live VC Music HUD -->
+      <!-- Enhanced Live VC Music HUD -->
       <div class="vc-hud-bar" id="vcHud">
         <div class="vc-info">
           <div class="vc-pulse" id="vcPulse"></div>
@@ -72,15 +72,59 @@
             <h4 id="hudSongTitle"><%= typeof player !== 'undefined' && player.currentSong ? player.currentSong.title : 'No track playing' %></h4>
             <p id="hudChannelInfo">
               <i class="fa-solid fa-volume-high" style="color: var(--accent-secondary);"></i> 
-              <span id="hudChannel"><%= typeof player !== 'undefined' && player.channelName ? player.channelName : 'Not in a voice channel' %></span>
+              <span id="hudChannel"><%= typeof player !== 'undefined' && player.channelName ? player.channelName : 'Disconnected from Voice' %></span>
             </p>
           </div>
         </div>
         <div class="vc-controls">
           <button class="btn-control" onclick="sendPlayerAction('pause')" title="Pause"><i class="fa-solid fa-pause"></i></button>
-          <button class="btn-control" onclick="sendPlayerAction('play')" title="Play"><i class="fa-solid fa-play"></i></button>
+          <button class="btn-control" onclick="sendPlayerAction('play')" title="Resume"><i class="fa-solid fa-play"></i></button>
           <button class="btn-control" onclick="sendPlayerAction('skip')" title="Skip"><i class="fa-solid fa-forward-step"></i></button>
+          <button class="btn-control" onclick="sendPlayerAction('stop')" title="Stop & Disconnect" style="color: var(--danger);"><i class="fa-solid fa-stop"></i></button>
         </div>
+      </div>
+
+      <!-- Quick Voice Action Cards -->
+      <div class="dashboard-actions-grid">
+        <button class="btn-action-card" onclick="joinMyVc()">
+          <div class="btn-action-icon" style="background: rgba(34, 197, 94, 0.15); color: var(--success);">
+            <i class="fa-solid fa-headset"></i>
+          </div>
+          <div class="btn-action-info">
+            <h4>Join My VC</h4>
+            <p>Connect bot to your channel</p>
+          </div>
+        </button>
+
+        <button class="btn-action-card" onclick="sendPlayerAction('shuffle')">
+          <div class="btn-action-icon" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-secondary);">
+            <i class="fa-solid fa-shuffle"></i>
+          </div>
+          <div class="btn-action-info">
+            <h4>Shuffle Queue</h4>
+            <p>Randomize current playlist</p>
+          </div>
+        </button>
+
+        <button class="btn-action-card" onclick="sendPlayerAction('clear')">
+          <div class="btn-action-icon" style="background: rgba(239, 68, 68, 0.15); color: var(--danger);">
+            <i class="fa-solid fa-trash-can"></i>
+          </div>
+          <div class="btn-action-info">
+            <h4>Clear Queue</h4>
+            <p>Remove upcoming tracks</p>
+          </div>
+        </button>
+
+        <button class="btn-action-card" onclick="window.location.href='/library'">
+          <div class="btn-action-icon">
+            <i class="fa-solid fa-book-open"></i>
+          </div>
+          <div class="btn-action-info">
+            <h4>Song Library</h4>
+            <p>Browse saved audio tracks</p>
+          </div>
+        </button>
       </div>
 
       <!-- Stat Cards Grid -->
@@ -108,8 +152,8 @@
             <span class="stat-card-label">Voice Connections</span>
             <div class="stat-card-icon green"><i class="fa-solid fa-microphone"></i></div>
           </div>
-          <div class="stat-card-value">0</div>
-          <div class="stat-card-change">Idle</div>
+          <div class="stat-card-value" id="listenerCount">0</div>
+          <div class="stat-card-change">Active listeners</div>
         </div>
 
         <div class="stat-card">
@@ -151,9 +195,13 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    
     socket.on('player_update', (player) => {
       document.getElementById('hudSongTitle').textContent = player.currentSong ? player.currentSong.title : 'No track playing';
-      document.getElementById('hudChannel').textContent = player.channelName;
+      document.getElementById('hudChannel').textContent = player.channelName || 'Disconnected from Voice';
+      if (document.getElementById('listenerCount')) {
+        document.getElementById('listenerCount').textContent = player.listeners || 0;
+      }
     });
 
     function sendPlayerAction(action) {
@@ -161,6 +209,23 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })
+      }).then(res => res.json()).then(data => {
+        if (!data.success && data.error) alert(data.error);
+      }).catch(err => console.error(err));
+    }
+
+    function joinMyVc() {
+      fetch('/api/player/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }).then(res => res.json()).then(data => {
+        if (data.success) {
+          alert('Successfully joined your voice channel!');
+        } else {
+          alert(data.error || 'Make sure you are connected to a voice channel in Discord first!');
+        }
+      }).catch(err => {
+        alert('Failed to connect to voice channel.');
       });
     }
   </script>
