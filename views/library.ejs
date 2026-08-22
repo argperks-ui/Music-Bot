@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library - Git Music</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <div class="app-layout">
+    <!-- Sidebar (Using your existing sidebar styling) -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">
+          <i class="fa-solid fa-music"></i>
+        </div>
+        <div class="sidebar-brand-text">
+          <h2>Git Music</h2>
+          <span>Dashboard</span>
+        </div>
+      </div>
+      
+      <div class="sidebar-nav">
+        <a href="/dashboard" class="nav-item">
+          <i class="fa-solid fa-chart-pie"></i> Dashboard
+        </a>
+        <a href="/guilds" class="nav-item">
+          <i class="fa-solid fa-server"></i> Servers
+        </a>
+        <a href="/library" class="nav-item active">
+          <i class="fa-solid fa-book-open"></i> Song Library
+        </a>
+        <a href="/logs" class="nav-item">
+          <i class="fa-solid fa-terminal"></i> Live Logs
+        </a>
+      </div>
+
+      <% if (user) { %>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar">
+          <div class="sidebar-user-info">
+            <div class="name"><%= user.global_name || user.username %></div>
+            <div class="status">Online</div>
+          </div>
+          <a href="/logout" style="color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i></a>
+        </div>
+      </div>
+      <% } %>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <div class="page-header">
+        <div>
+          <h1>Song Library</h1>
+          <p>Manage your saved tracks and playlists globally.</p>
+        </div>
+        <div class="header-time">
+          <i class="fa-regular fa-clock"></i> <span id="clock">Syncing...</span>
+        </div>
+      </div>
+
+      <!-- Replit-Style Live VC Player HUD -->
+      <div class="vc-hud-bar" id="vcHud">
+        <div class="vc-info">
+          <div class="vc-pulse" id="vcPulse"></div>
+          <div class="vc-song-details">
+            <h4 id="hudSongTitle"><%= typeof player !== 'undefined' && player.currentSong ? player.currentSong.title : 'No track playing' %></h4>
+            <p id="hudChannelInfo">
+              <i class="fa-solid fa-volume-high" style="color: var(--accent-secondary);"></i> 
+              <span id="hudChannel"><%= typeof player !== 'undefined' ? player.channelName : 'Not in a voice channel' %></span>
+            </p>
+          </div>
+        </div>
+        <div class="vc-controls">
+          <button class="btn-control" onclick="sendPlayerAction('pause')" title="Pause"><i class="fa-solid fa-pause"></i></button>
+          <button class="btn-control" onclick="sendPlayerAction('play')" title="Play"><i class="fa-solid fa-play"></i></button>
+          <button class="btn-control" onclick="sendPlayerAction('skip')" title="Skip"><i class="fa-solid fa-forward-step"></i></button>
+        </div>
+      </div>
+
+      <!-- Add Song Form (Using your Glass Card) -->
+      <div class="glass-card">
+        <h3><i class="fa-solid fa-plus-circle" style="color: var(--accent-primary);"></i> Add to Library</h3>
+        <form id="addSongForm">
+          <div class="settings-form" style="align-items: flex-end;">
+            <div class="form-group">
+              <label>Song Title</label>
+              <input type="text" name="title" placeholder="e.g. Synthwave Radio" required>
+            </div>
+            <div class="form-group">
+              <label>Audio URL / YouTube Link</label>
+              <input type="text" name="url" placeholder="https://..." required>
+            </div>
+            <div class="form-group" style="max-width: 150px;">
+              <button type="submit" class="btn-primary" style="height: 42px; width: 100%;">
+                <i class="fa-solid fa-upload"></i> Save
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Stored Songs Table -->
+      <div class="glass-card">
+        <h3><i class="fa-solid fa-list-music" style="color: var(--accent-secondary);"></i> Stored Library Tracks</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Added By</th>
+                <th>Date Added</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (typeof songs !== 'undefined' && songs.length > 0) { %>
+                <% songs.forEach(song => { %>
+                  <tr>
+                    <td style="font-weight: 500; color: var(--text-primary);"><%= song.title %></td>
+                    <td><%= song.added_by || 'Admin' %></td>
+                    <td><%= new Date(song.created_at).toLocaleDateString() %></td>
+                    <td style="text-align: right;">
+                      <button class="btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="playSong('<%= song.url %>')">
+                        <i class="fa-solid fa-play"></i> Play
+                      </button>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    <i class="fa-solid fa-compact-disc fa-2x" style="margin-bottom: 10px; opacity: 0.5;"></i><br>
+                    No songs stored in library yet.
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Live Clock setup
+    function updateClock() {
+      document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Socket.io updates for the HUD
+    const socket = io();
+    socket.on('player_update', (player) => {
+      document.getElementById('hudSongTitle').textContent = player.currentSong ? player.currentSong.title : 'No track playing';
+      document.getElementById('hudChannel').textContent = player.channelName;
+    });
+
+    // Control Buttons
+    function sendPlayerAction(action) {
+      fetch('/api/player/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      }).then(res => res.json()).then(data => {
+        if (!data.success) alert('Action failed');
+      });
+    }
+
+    // Add Song Form Handler
+    document.getElementById('addSongForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const res = await fetch('/api/library/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(formData))
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.reload();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    });
+
+    function playSong(url) {
+      // Logic to queue the song to the bot
+      alert('Queueing song URL: ' + url);
+    }
+  </script>
+</body>
+</html>

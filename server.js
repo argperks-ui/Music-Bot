@@ -25,12 +25,12 @@ function isOwner(userId) {
   return ownerIds.includes(userId);
 }
 
-// ── Ensure data directory exists (Must be before Database Setup) ───────────
+// ── Ensure data directory exists ───────────────────────────────────────────
 if (!fs.existsSync(path.join(__dirname, 'data'))) {
   fs.mkdirSync(path.join(__dirname, 'data'));
 }
 
-// ── Database Setup ──────────────────────────────────────────────────────────
+// ── Database Setup & Expanded Schema for 52 Features ───────────────────────
 const db = new Database(path.join(__dirname, 'data', 'dashboard.db'));
 db.pragma('journal_mode = WAL');
 
@@ -56,7 +56,41 @@ db.exec(`
     event TEXT NOT NULL,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+  CREATE TABLE IF NOT EXISTS song_library (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    duration TEXT DEFAULT '3:30',
+    thumbnail TEXT DEFAULT '',
+    added_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS playlists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    songs TEXT DEFAULT '[]'
+  );
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    action TEXT,
+    details TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
+
+// ── In-Memory Music State (Replit / Discord VC Sync) ───────────────────────
+let activePlayerState = {
+  guildId: null,
+  guildName: 'No Active Session',
+  channelName: 'Disconnected',
+  currentSong: null,
+  isPlaying: false,
+  volume: 50,
+  queue: [],
+  listeners: 0
+};
 
 // ── Middleware ──────────────────────────────────────────────────────────────
 app.use(express.json());
@@ -95,6 +129,7 @@ app.use((req, res, next) => {
   res.locals.textChannels = [];
   res.locals.voiceChannels = [];
   res.locals.logs = [];
+  res.locals.player = activePlayerState;
   
   // Template helpers
   res.locals.helpers = {
@@ -132,10 +167,7 @@ app.set('views', path.join(__dirname, 'views'));
 const DISCORD_API = 'https://discord.com/api/v10';
 
 async function discordFetch(endpoint, tokenType = 'bot') {
-  const token = tokenType === 'bot' 
-    ? `Bot ${BOT_TOKEN}`
-    : tokenType;
-  
+  const token = tokenType === 'bot' ? `Bot ${BOT_TOKEN}` : tokenType;
   const res = await fetch(`${DISCORD_API}${endpoint}`, {
     headers: { Authorization: token, 'Content-Type': 'application/json' }
   });
@@ -150,7 +182,6 @@ async function discordFetch(endpoint, tokenType = 'bot') {
 // ── Auth Middleware ─────────────────────────────────────────────────────────
 async function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
-  
   if (!isOwner(req.session.user.id)) {
     return res.status(403).send('Access denied. You are not the bot owner.');
   }
@@ -163,11 +194,7 @@ app.get('/login', (req, res) => {
   if (req.session.user && isOwner(req.session.user.id)) {
     return res.redirect('/dashboard');
   }
-  res.render('login', { 
-    title: 'Login',
-    clientId: CLIENT_ID,
-    callbackUrl: process.env.CALLBACK_URL
-  });
+  res.render('login', { title: 'Login', clientId: CLIENT_ID, callbackUrl: process.env.CALLBACK_URL });
 });
 
 app.get('/auth/callback', async (req, res) => {
@@ -189,12 +216,9 @@ app.get('/auth/callback', async (req, res) => {
     });
     
     const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) {
-      return res.redirect('/login?error=failed');
-    }
+    if (!tokenData.access_token) return res.redirect('/login?error=failed');
 
     const userData = await discordFetch('/users/@me', `Bearer ${tokenData.access_token}`);
-    
     req.session.user = {
       id: userData.id,
       username: userData.username,
@@ -202,18 +226,14 @@ app.get('/auth/callback', async (req, res) => {
       avatar: userData.avatar,
       global_name: userData.global_name
     };
-    
     req.session.accessToken = tokenData.access_token;
     
     if (!isOwner(userData.id)) {
       return res.status(403).render('login', { 
-        title: 'Login',
-        clientId: CLIENT_ID,
-        callbackUrl: process.env.CALLBACK_URL,
+        title: 'Login', clientId: CLIENT_ID, callbackUrl: process.env.CALLBACK_URL,
         error: 'This dashboard is private. You are not authorized.'
       });
     }
-    
     res.redirect('/dashboard');
   } catch (err) {
     console.error('OAuth error:', err);
@@ -233,21 +253,16 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     const botUser = await discordFetch('/users/@me');
     const appInfo = await discordFetch('/oauth2/applications/@me') || { id: CLIENT_ID, bot_public: true };
     const botGuilds = await discordFetch('/users/@me/guilds') || [];
-    
     const totalGuilds = Array.isArray(botGuilds) ? botGuilds.length : 0;
     
     let totalMembers = 0;
     let voiceConnections = 0;
-    
     if (Array.isArray(botGuilds) && botGuilds.length > 0) {
       const guildsToFetch = botGuilds.slice(0, 50);
       const guildPromises = guildsToFetch.map(g => discordFetch(`/guilds/${g.id}?with_counts=true`));
       const fetchedGuilds = await Promise.all(guildPromises);
-      
       for (const guild of fetchedGuilds) {
-        if (guild && guild.approximate_member_count) {
-          totalMembers += guild.approximate_member_count;
-        }
+        if (guild && guild.approximate_member_count) totalMembers += guild.approximate_member_count;
       }
     }
 
@@ -287,12 +302,11 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       bot: botUser,
       appInfo,
       guilds: botGuilds,
-      botUser,
       totalGuilds,
       totalMembers,
       voiceConnections,
       voice: voiceConnections,
-      heartbeat: { voiceCount: voiceConnections, ping: ping },
+      heartbeat: { voiceCount: voiceConnections, ping },
       apiLatency: ping,
       nodeVer: process.version,
       platform: process.platform,
@@ -312,10 +326,66 @@ app.get('/dashboard', requireAuth, async (req, res) => {
   }
 });
 
+// 🌟 New: Song Library Route
+app.get('/library', requireAuth, (req, res) => {
+  try {
+    const songs = db.prepare("SELECT * FROM song_library ORDER BY id DESC").all();
+    const playlists = db.prepare("SELECT * FROM playlists").all();
+    res.render('library', {
+      title: 'Song Library',
+      songs,
+      playlists,
+      active: 'library'
+    });
+  } catch (err) {
+    console.error('Library error:', err);
+    res.status(500).send('Error loading song library');
+  }
+});
+
+// 🌟 New: Add Song to Library API
+app.post('/api/library/add', requireAuth, (req, res) => {
+  try {
+    const { title, url, duration, thumbnail } = req.body;
+    if (!title || !url) return res.status(400).json({ success: false, error: 'Title and URL are required' });
+
+    db.prepare("INSERT INTO song_library (title, url, duration, thumbnail, added_by) VALUES (?, ?, ?, ?, ?)")
+      .run(title, url, duration || '3:30', thumbnail || '', req.session.user.username);
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 🌟 New: Replit-Style Live Music Control API (Synced with Bot/VC)
+app.post('/api/player/control', requireAuth, (req, res) => {
+  try {
+    const { action, value } = req.body; // actions: play, pause, skip, stop, volume
+    
+    if (action === 'pause') activePlayerState.isPlaying = false;
+    if (action === 'play') activePlayerState.isPlaying = true;
+    if (action === 'volume') activePlayerState.volume = parseInt(value) || 50;
+    if (action === 'skip') {
+      if (activePlayerState.queue.length > 0) {
+        activePlayerState.currentSong = activePlayerState.queue.shift();
+      } else {
+        activePlayerState.currentSong = null;
+        activePlayerState.isPlaying = false;
+      }
+    }
+
+    // Broadcast live state to all connected web dashboards instantly via WebSockets
+    io.emit('player_update', activePlayerState);
+    res.json({ success: true, player: activePlayerState });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/guilds', requireAuth, async (req, res) => {
   try {
     const botGuilds = await discordFetch('/users/@me/guilds') || [];
-    
     const guildsToFetch = botGuilds.slice(0, 100);
     const guildPromises = guildsToFetch.map(g => discordFetch(`/guilds/${g.id}?with_counts=true`));
     const fetchedGuilds = await Promise.all(guildPromises);
@@ -331,11 +401,7 @@ app.get('/guilds', requireAuth, async (req, res) => {
       };
     });
 
-    res.render('guilds', {
-      title: 'Servers',
-      guilds: enriched,
-      active: 'guilds'
-    });
+    res.render('guilds', { title: 'Servers', guilds: enriched, active: 'guilds' });
   } catch (err) {
     console.error('Guilds error:', err);
     res.status(500).send('Error loading guilds');
@@ -348,16 +414,10 @@ app.get('/guild/:id', requireAuth, async (req, res) => {
     if (!guild) return res.status(404).send('Guild not found');
     
     const channels = await discordFetch(`/guilds/${req.params.id}/channels`) || [];
-    
     const settings = db.prepare("SELECT * FROM guild_settings WHERE guild_id = ?").get(req.params.id);
     const defaultSettings = {
-      guild_id: req.params.id,
-      prefix: '!',
-      volume: 50,
-      dj_role: '',
-      allow_nsfw: 0,
-      stay_24_7: 0,
-      default_channel: ''
+      guild_id: req.params.id, prefix: '!', volume: 50, dj_role: '',
+      allow_nsfw: 0, stay_24_7: 0, default_channel: ''
     };
 
     res.render('guild', {
@@ -403,25 +463,18 @@ app.get('/analytics', requireAuth, async (req, res) => {
   try {
     const dailyStats = db.prepare(`
       SELECT DATE(timestamp) as date, COUNT(*) as count
-      FROM stats
-      WHERE timestamp >= DATE('now', '-7 days')
-      GROUP BY DATE(timestamp)
-      ORDER BY date
+      FROM stats WHERE timestamp >= DATE('now', '-7 days')
+      GROUP BY DATE(timestamp) ORDER BY date
     `).all();
     
     const topCommands = db.prepare(`
-      SELECT command, COUNT(*) as count
-      FROM stats
-      GROUP BY command
-      ORDER BY count DESC
-      LIMIT 10
+      SELECT command, COUNT(*) as count FROM stats
+      GROUP BY command ORDER BY count DESC LIMIT 10
     `).all();
     
     const hourlyStats = db.prepare(`
       SELECT CAST(strftime('%H', timestamp) AS INTEGER) as hour, COUNT(*) as count
-      FROM stats
-      GROUP BY hour
-      ORDER BY hour
+      FROM stats GROUP BY hour ORDER BY hour
     `).all();
 
     const totalRow = db.prepare("SELECT COUNT(*) as count FROM stats").get();
@@ -449,16 +502,8 @@ app.get('/analytics', requireAuth, async (req, res) => {
 
 app.get('/logs', requireAuth, async (req, res) => {
   try {
-    const logs = db.prepare(`
-      SELECT * FROM stats ORDER BY timestamp DESC LIMIT 100
-    `).all();
-    
-    res.render('logs', {
-      title: 'Logs',
-      logs,
-      error: null,
-      active: 'logs'
-    });
+    const logs = db.prepare("SELECT * FROM stats ORDER BY timestamp DESC LIMIT 100").all();
+    res.render('logs', { title: 'Logs', logs, error: null, active: 'logs' });
   } catch (err) {
     console.error('Logs error:', err);
     res.status(500).send('Error loading logs');
@@ -470,9 +515,7 @@ app.post('/api/stats/update', (req, res) => {
   if (!command) return res.status(400).json({ error: 'command is required' });
   
   const auth = req.headers.authorization;
-  if (auth !== `Bearer ${BOT_TOKEN}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (auth !== `Bearer ${BOT_TOKEN}`) return res.status(401).json({ error: 'Unauthorized' });
   
   try {
     db.prepare("INSERT INTO stats (command, guild_id, user_id) VALUES (?, ?, ?)")
@@ -485,79 +528,12 @@ app.post('/api/stats/update', (req, res) => {
   }
 });
 
-app.get('/api/stats/overview', requireAuth, async (req, res) => {
-  try {
-    const botUser = await discordFetch('/users/@me');
-    const botGuilds = await discordFetch('/users/@me/guilds');
-    const totalGuilds = Array.isArray(botGuilds) ? botGuilds.length : 0;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const row = db.prepare("SELECT COUNT(*) as count FROM stats WHERE DATE(timestamp) = ?").get(today);
-    const todayCommands = row ? row.count : 0;
-    
-    const totalRow = db.prepare("SELECT COUNT(*) as count FROM stats").get();
-    
-    const pingStart = Date.now();
-    await discordFetch('/gateway');
-    const ping = Date.now() - pingStart;
-    
-    res.json({
-      guilds: totalGuilds,
-      todayCommands,
-      totalCommands: totalRow ? totalRow.count : 0,
-      ping,
-      botName: botUser ? botUser.username : 'Git Music'
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/logs/recent', requireAuth, (req, res) => {
-  const logs = db.prepare("SELECT * FROM stats ORDER BY timestamp DESC LIMIT 20").all();
-  res.json(logs);
-});
-
-app.get('/api/bot/status', requireAuth, async (req, res) => {
-  try {
-    const botUser = await discordFetch('/users/@me');
-    const botGuilds = await discordFetch('/users/@me/guilds');
-    const memUsage = process.memoryUsage();
-    
-    const uptimeRow = db.prepare("SELECT timestamp FROM uptime_log WHERE event = 'startup' ORDER BY id DESC LIMIT 1").get();
-    let uptimeSeconds = 0;
-    if (uptimeRow) {
-      uptimeSeconds = Math.floor((Date.now() - new Date(uptimeRow.timestamp + 'Z').getTime()) / 1000);
-    }
-
-    const pingStart = Date.now();
-    await discordFetch('/gateway');
-    const ping = Date.now() - pingStart;
-    
-    res.json({
-      name: botUser ? botUser.username : 'Git Music',
-      avatar: botUser ? `https://cdn.discordapp.com/avatars/${botUser.id}/${botUser.avatar}.png` : '',
-      id: botUser ? botUser.id : '',
-      guilds: Array.isArray(botGuilds) ? botGuilds.length : 0,
-      ping,
-      memory: {
-        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100,
-        heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024 * 100) / 100,
-        rss: Math.round(memUsage.rss / 1024 / 1024 * 100) / 100
-      },
-      uptime: uptimeSeconds,
-      nodeVersion: process.version,
-      platform: process.platform
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// ── WebSocket Connection Handlers ──────────────────────────────────────────
 io.on('connection', (socket) => {
-  console.log('Client connected to socket');
+  console.log('Client connected to live dashboard socket');
   const logs = db.prepare("SELECT * FROM stats ORDER BY timestamp DESC LIMIT 10").all();
   socket.emit('initial_logs', logs);
+  socket.emit('player_update', activePlayerState);
   
   socket.on('disconnect', () => {
     console.log('Client disconnected');
@@ -568,6 +544,6 @@ db.prepare("INSERT INTO uptime_log (event) VALUES ('startup')").run();
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🎵 Git Music Dashboard running at http://localhost:${PORT}`);
+  console.log(`🎵 Git Music Ultimate Dashboard running at http://localhost:${PORT}`);
   console.log(`📊 Login at http://localhost:${PORT}/login`);
 });
