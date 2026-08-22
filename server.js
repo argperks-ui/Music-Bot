@@ -92,6 +92,19 @@ app.use((req, res, next) => {
       if (!timestamp) return '—';
       const d = new Date(timestamp);
       return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    },
+    fmtUptime: (seconds) => {
+      if (!seconds || isNaN(seconds)) return '0s';
+      const days = Math.floor(seconds / (3600 * 24));
+      const hours = Math.floor((seconds % (3600 * 24)) / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      let result = '';
+      if (days > 0) result += `${days}d `;
+      if (hours > 0 || days > 0) result += `${hours}h `;
+      if (minutes > 0 || hours > 0 || days > 0) result += `${minutes}m `;
+      result += `${secs}s`;
+      return result.trim();
     }
   };
   
@@ -237,9 +250,11 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     
     const uptimeRow = db.prepare("SELECT timestamp FROM uptime_log WHERE event = 'startup' ORDER BY id DESC LIMIT 1").get();
     let uptime = 'N/A';
+    let uptimeSec = 0;
     if (uptimeRow) {
       const startTime = new Date(uptimeRow.timestamp + 'Z');
       const diff = Date.now() - startTime.getTime();
+      uptimeSec = Math.floor(diff / 1000);
       const hours = Math.floor(diff / 3600000);
       const minutes = Math.floor((diff % 3600000) / 60000);
       uptime = `${hours}h ${minutes}m`;
@@ -276,6 +291,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       todayCommands,
       totalCommands,
       uptime,
+      uptimeSec,
       ping,
       active: 'dashboard'
     });
