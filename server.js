@@ -230,6 +230,8 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       totalGuilds,
       totalMembers,
       voiceConnections,
+      voice: voiceConnections,
+      heartbeat: { voiceCount: voiceConnections },
       todayCommands,
       totalCommands,
       uptime,
