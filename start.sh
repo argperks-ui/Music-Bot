@@ -3,4 +3,4 @@
 node server.js &
 
 # Start the Python Discord bot in the foreground
-python bot.py
+python3 bot.py
