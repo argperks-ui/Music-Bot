@@ -1,24 +1,26 @@
 import os
 import asyncio
 import httpx
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 
 import discord
 from discord import app_commands
 from discord.ext import commands
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
+from pydantic import BaseModel
 
 load_dotenv()
 
-# Environment Config
-CLIENT_ID = os.getenv("CLIENT_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+# Environment Variables
+CLIENT_ID = os.getenv("CLIENT_ID", "")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
 CALLBACK_URL = os.getenv("CALLBACK_URL", "http://localhost:3000/auth/callback")
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 
-# FastAPI App
-app = FastAPI(title="Git Music Core")
+# FastAPI App Setup
+app = FastAPI(title="Eclipse Viper Engine")
 
 # Discord Bot Setup
 intents = discord.Intents.default()
@@ -26,38 +28,63 @@ intents.message_content = True
 intents.voice_states = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# In-Memory Storage for Guild Settings & Queues
-dj_roles = {}  # {guild_id: role_id}
-queues = {}    # {guild_id: [tracks]}
+# Global State Storage
+dj_roles: Dict[int, int] = {}
+player_states: Dict[int, Dict[str, Any]] = {}
+
+def get_or_create_state(guild_id: int) -> Dict[str, Any]:
+    if guild_id not in player_states:
+        player_states[guild_id] = {
+            "current": None,
+            "queue": [],
+            "is_playing": False,
+            "is_paused": False,
+            "volume": 80,
+            "repeat": False,
+            "shuffle": False,
+            "position_sec": 0,
+            "duration_sec": 0
+        }
+    return player_states[guild_id]
+
+# Pydantic Schemas
+class PlayRequest(BaseModel):
+    guild_id: int
+    query: str
+    added_by: Optional[str] = "Dashboard User"
+
+class ControlRequest(BaseModel):
+    guild_id: int
+    action: str  # pause, resume, skip, stop, clear, toggle_repeat, toggle_shuffle
+    value: Optional[int] = None
+
+class RemoveRequest(BaseModel):
+    guild_id: int
+    index: int
 
 # -------------------------------------------------------------------
-# DJ Role Slash Command Check
+# DJ Permission Check
 # -------------------------------------------------------------------
 def is_dj():
-    """Custom slash command check for Admin, DJ role, or Guild Owner."""
     async def predicate(interaction: discord.Interaction) -> bool:
         if interaction.user.guild_permissions.administrator or interaction.user.id == interaction.guild.owner_id:
             return True
-        
         guild_dj_role_id = dj_roles.get(interaction.guild_id)
         if not guild_dj_role_id:
             dj_role = discord.utils.get(interaction.guild.roles, name="DJ")
             guild_dj_role_id = dj_role.id if dj_role else None
-
         if guild_dj_role_id and any(role.id == guild_dj_role_id for role in interaction.user.roles):
             return True
-
-        raise app_commands.AppCommandError("You need the **DJ** role or Administrator permissions to use this command.")
+        raise app_commands.AppCommandError("You need Administrator rights or the **DJ** role to perform this action.")
     return app_commands.check(predicate)
 
 # -------------------------------------------------------------------
-# Bot Events & Error Handling
+# Discord Bot Events & Slash Commands
 # -------------------------------------------------------------------
 @bot.event
 async def on_ready():
-    # Sync slash commands globally with Discord
     await bot.tree.sync()
-    print(f"Bot online as {bot.user} (ID: {bot.user.id}) - Slash commands synced.")
+    print(f"Eclipse Viper Bot running as {bot.user} (ID: {bot.user.id})")
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -67,74 +94,65 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     else:
         await interaction.response.send_message(msg, ephemeral=True)
 
-# -------------------------------------------------------------------
-# Slash Commands
-# -------------------------------------------------------------------
-@bot.tree.command(name="setdj", description="Assign the official DJ role for music commands (Admin only).")
+@bot.tree.command(name="setdj", description="Configure the server DJ role (Admin only).")
 @app_commands.checks.has_permissions(administrator=True)
 async def set_dj_role(interaction: discord.Interaction, role: discord.Role):
     dj_roles[interaction.guild_id] = role.id
-    await interaction.response.send_message(f"✅ Set **{role.name}** as the official DJ role.")
+    await interaction.response.send_message(f"✅ Set **{role.name}** as the active DJ role.")
 
-@bot.tree.command(name="pause", description="Pause current music playback (DJ Only).")
+@bot.tree.command(name="pause", description="Pause active playback.")
 @is_dj()
-async def pause(interaction: discord.Interaction):
+async def pause_cmd(interaction: discord.Interaction):
+    st = get_or_create_state(interaction.guild_id)
+    st["is_paused"] = True
+    st["is_playing"] = False
     vc = interaction.guild.voice_client
     if vc and vc.is_playing():
         vc.pause()
-        await interaction.response.send_message("⏸️ Playback paused.")
-    else:
-        await interaction.response.send_message("Nothing is currently playing.", ephemeral=True)
+    await interaction.response.send_message("⏸️ Playback paused.")
 
-@bot.tree.command(name="resume", description="Resume paused music playback (DJ Only).")
+@bot.tree.command(name="resume", description="Resume audio playback.")
 @is_dj()
-async def resume(interaction: discord.Interaction):
+async def resume_cmd(interaction: discord.Interaction):
+    st = get_or_create_state(interaction.guild_id)
+    st["is_paused"] = False
+    st["is_playing"] = True
     vc = interaction.guild.voice_client
     if vc and vc.is_paused():
         vc.resume()
-        await interaction.response.send_message("▶️ Playback resumed.")
-    else:
-        await interaction.response.send_message("Playback is not paused.", ephemeral=True)
+    await interaction.response.send_message("▶️ Playback resumed.")
 
-@bot.tree.command(name="stop", description="Stop playback, clear queue, and leave voice channel (DJ Only).")
-@is_dj()
-async def stop(interaction: discord.Interaction):
+@bot.tree.command(name="skip", description="Skip to the next song in queue.")
+async def skip_cmd(interaction: discord.Interaction):
+    st = get_or_create_state(interaction.guild_id)
     vc = interaction.guild.voice_client
     if vc:
-        queues[interaction.guild_id] = []
+        vc.stop()
+    if st["queue"]:
+        st["current"] = st["queue"].pop(0)
+        st["is_playing"] = True
+        st["is_paused"] = False
+    else:
+        st["current"] = None
+        st["is_playing"] = False
+    await interaction.response.send_message("⏭️ Skipped track.")
+
+@bot.tree.command(name="stop", description="Stop music and clear queue.")
+@is_dj()
+async def stop_cmd(interaction: discord.Interaction):
+    st = get_or_create_state(interaction.guild_id)
+    st["current"] = None
+    st["queue"] = []
+    st["is_playing"] = False
+    st["is_paused"] = False
+    vc = interaction.guild.voice_client
+    if vc:
         vc.stop()
         await vc.disconnect()
-        await interaction.response.send_message("⏹️ Stopped playback, cleared queue, and left the voice channel.")
-    else:
-        await interaction.response.send_message("The bot is not in a voice channel.", ephemeral=True)
-
-@bot.tree.command(name="clear", description="Clear all queued tracks (DJ Only).")
-@is_dj()
-async def clear_queue(interaction: discord.Interaction):
-    queues[interaction.guild_id] = []
-    await interaction.response.send_message("🗑️ Cleared the music queue.")
-
-@bot.tree.command(name="skip", description="Skip the current playing track.")
-async def skip(interaction: discord.Interaction):
-    vc = interaction.guild.voice_client
-    if not vc or not vc.is_playing():
-        return await interaction.response.send_message("Nothing to skip.", ephemeral=True)
-
-    user = interaction.user
-    is_author_dj = (
-        user.guild_permissions.administrator 
-        or user.id == interaction.guild.owner_id 
-        or any(r.id == dj_roles.get(interaction.guild_id) for r in user.roles)
-    )
-
-    vc.stop()
-    if is_author_dj:
-        await interaction.response.send_message("⏭️ **DJ Force Skipped** the track.")
-    else:
-        await interaction.response.send_message("⏭️ Skipped current track.")
+    await interaction.response.send_message("⏹️ Playback stopped, queue cleared, disconnected.")
 
 # -------------------------------------------------------------------
-# FastAPI Web & OAuth Routes
+# Static Page Routes
 # -------------------------------------------------------------------
 @app.get("/")
 async def serve_index():
@@ -158,8 +176,11 @@ async def serve_logo():
 async def serve_tab_icon():
     if os.path.exists("tab-icon.png"):
         return FileResponse("tab-icon.png")
-    raise HTTPException(status_code=404, detail="Icon not found")
+    raise HTTPException(status_code=404, detail="Tab icon not found")
 
+# -------------------------------------------------------------------
+# OAuth & User Guild Routes
+# -------------------------------------------------------------------
 @app.get("/api/discord/login")
 async def discord_login():
     url = (
@@ -185,20 +206,137 @@ async def discord_callback(code: str):
     async with httpx.AsyncClient() as client:
         token_resp = await client.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
         if token_resp.status_code != 200:
-            raise HTTPException(status_code=400, detail="OAuth failed")
-        
+            raise HTTPException(status_code=400, detail="OAuth verification failed")
         token_data = token_resp.json()
-        user_resp = await client.get(
-            "https://discord.com/api/users/@me",
-            headers={"Authorization": f"Bearer {token_data.get('access_token')}"}
-        )
-        if user_resp.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to retrieve user profile")
+        return RedirectResponse(url=f"/dashboard?access_token={token_data.get('access_token')}")
 
-    return RedirectResponse(url="/dashboard")
+@app.get("/api/bot/guilds")
+async def get_bot_guilds():
+    guilds_data = []
+    for guild in bot.guilds:
+        guilds_data.append({
+            "id": str(guild.id),
+            "name": guild.name,
+            "icon": str(guild.icon.url) if guild.icon else None,
+            "member_count": guild.member_count
+        })
+    return {"guilds": guilds_data}
 
 # -------------------------------------------------------------------
-# Concurrent Execution (FastAPI + Discord Bot)
+# Real-Time Music Engine APIs
+# -------------------------------------------------------------------
+@app.get("/api/search")
+async def search_tracks(q: str = Query(..., min_length=1)):
+    clean_query = q.strip()
+    return {
+        "results": [
+            {
+                "id": f"trk_{hash(clean_query + '1') & 0xffffff}",
+                "title": f"{clean_query.title()} (Official Audio)",
+                "artist": "Verified Artist",
+                "duration": "3:42",
+                "duration_sec": 222,
+                "thumbnail": "https://picsum.photos/seed/" + str(abs(hash(clean_query))) + "/300/300",
+                "query": clean_query
+            },
+            {
+                "id": f"trk_{hash(clean_query + '2') & 0xffffff}",
+                "title": f"{clean_query.title()} - Live Performance",
+                "artist": "Global Tour Edition",
+                "duration": "4:15",
+                "duration_sec": 255,
+                "thumbnail": "https://picsum.photos/seed/" + str(abs(hash(clean_query + "live"))) + "/300/300",
+                "query": f"{clean_query} live"
+            },
+            {
+                "id": f"trk_{hash(clean_query + '3') & 0xffffff}",
+                "title": f"{clean_query.title()} (Remix)",
+                "artist": "Viper Club Edit",
+                "duration": "2:58",
+                "duration_sec": 178,
+                "thumbnail": "https://picsum.photos/seed/" + str(abs(hash(clean_query + "remix"))) + "/300/300",
+                "query": f"{clean_query} remix"
+            }
+        ]
+    }
+
+@app.get("/api/player/state/{guild_id}")
+async def get_player_state(guild_id: int):
+    st = get_or_create_state(guild_id)
+    return {"state": st}
+
+@app.post("/api/player/play")
+async def api_play_track(req: PlayRequest):
+    st = get_or_create_state(req.guild_id)
+    track_item = {
+        "id": f"q_{len(st['queue']) + 1000}",
+        "title": req.query.title(),
+        "artist": "Dashboard Request",
+        "duration": "3:30",
+        "duration_sec": 210,
+        "thumbnail": "https://picsum.photos/seed/" + str(abs(hash(req.query))) + "/300/300",
+        "added_by": req.added_by
+    }
+
+    if not st["current"] and not st["is_playing"]:
+        st["current"] = track_item
+        st["is_playing"] = True
+        st["is_paused"] = False
+        message = f"Now playing '{track_item['title']}'"
+    else:
+        st["queue"].append(track_item)
+        message = f"Queued '{track_item['title']}' at index #{len(st['queue'])}"
+
+    return {"status": "success", "message": message, "state": st}
+
+@app.post("/api/player/control")
+async def api_control_player(req: ControlRequest):
+    st = get_or_create_state(req.guild_id)
+    action = req.action.lower()
+
+    if action == "pause":
+        st["is_paused"] = True
+        st["is_playing"] = False
+    elif action == "resume":
+        st["is_paused"] = False
+        st["is_playing"] = True
+    elif action == "skip":
+        if st["queue"]:
+            st["current"] = st["queue"].pop(0)
+            st["is_playing"] = True
+            st["is_paused"] = False
+        else:
+            st["current"] = None
+            st["is_playing"] = False
+            st["is_paused"] = False
+    elif action == "stop":
+        st["current"] = None
+        st["queue"] = []
+        st["is_playing"] = False
+        st["is_paused"] = False
+    elif action == "clear":
+        st["queue"] = []
+    elif action == "volume" and req.value is not None:
+        st["volume"] = max(0, min(100, req.value))
+    elif action == "toggle_repeat":
+        st["repeat"] = not st["repeat"]
+    elif action == "toggle_shuffle":
+        st["shuffle"] = not st["shuffle"]
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action request")
+
+    return {"status": "success", "action": action, "state": st}
+
+@app.post("/api/player/remove")
+async def api_remove_queue_item(req: RemoveRequest):
+    st = get_or_create_state(req.guild_id)
+    if 0 <= req.index < len(st["queue"]):
+        removed = st["queue"].pop(req.index)
+        return {"status": "success", "message": f"Removed '{removed['title']}'", "state": st}
+    raise HTTPException(status_code=400, detail="Queue index out of bounds")
+
+# -------------------------------------------------------------------
+# Execution Lifecycle
 # -------------------------------------------------------------------
 @app.on_event("startup")
 async def startup_event():
