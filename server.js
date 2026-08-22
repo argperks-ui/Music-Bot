@@ -12,7 +12,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// ── Multi-Owner Helper (Fixed to handle both OWNER_IDS and OWNER_ID properly) ──
+// ── Multi-Owner Helper ─────────────────────────────────────────────────────
 function isOwner(userId) {
   if (!userId) return false;
   const rawOwners = process.env.OWNER_IDS || process.env.OWNER_ID || '';
@@ -105,6 +105,7 @@ app.get('/login', (req, res) => {
     return res.redirect('/dashboard');
   }
   res.render('login', { 
+    title: 'Login',
     clientId: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
     callbackUrl: process.env.CALLBACK_URL
   });
@@ -150,6 +151,7 @@ app.get('/auth/callback', async (req, res) => {
     
     if (!isOwner(userData.id)) {
       return res.status(403).render('login', { 
+        title: 'Login',
         clientId: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
         callbackUrl: process.env.CALLBACK_URL,
         error: 'This dashboard is private. You are not authorized.'
@@ -219,6 +221,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     const ping = Date.now() - pingStart;
 
     res.render('dashboard', {
+      title: 'Dashboard',
       user: req.session.user,
       botUser,
       totalGuilds,
@@ -255,6 +258,7 @@ app.get('/guilds', requireAuth, async (req, res) => {
     }
 
     res.render('guilds', {
+      title: 'Servers',
       user: req.session.user,
       guilds: enriched,
       activePage: 'guilds'
@@ -286,6 +290,7 @@ app.get('/guild/:id', requireAuth, async (req, res) => {
     };
 
     res.render('guild', {
+      title: 'Guild Settings',
       user: req.session.user,
       guild,
       channels: channels.filter(c => c.type === 0 || c.type === 2 || c.type === 5), // text, voice, announcement
@@ -359,6 +364,7 @@ app.get('/analytics', requireAuth, async (req, res) => {
     const todayRow = db.prepare("SELECT COUNT(*) as count FROM stats WHERE DATE(timestamp) = ?").get(today);
 
     res.render('analytics', {
+      title: 'Analytics',
       user: req.session.user,
       dailyStats: JSON.stringify(dailyStats),
       topCommands: JSON.stringify(topCommands),
@@ -381,6 +387,7 @@ app.get('/logs', requireAuth, async (req, res) => {
     `).all();
     
     res.render('logs', {
+      title: 'Logs',
       user: req.session.user,
       logs,
       activePage: 'logs'
