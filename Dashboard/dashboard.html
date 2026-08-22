@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eclipse Viper Control Engine</title>
+  <title>Eclipse Viper Studio Platform</title>
   <link rel="icon" type="image/png" href="/tab-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   
   <style>
     :root {
-      --bg-dark: #07090e;
-      --card-bg: rgba(18, 24, 38, 0.75);
+      --bg-dark: #05070a;
+      --card-bg: rgba(13, 18, 30, 0.8);
       --card-border: rgba(255, 255, 255, 0.08);
       --accent-cyan: #00f2fe;
       --accent-purple: #7928ca;
@@ -20,7 +20,7 @@
       --text-main: #f1f5f9;
       --text-muted: #64748b;
       --danger: #ff4757;
-      --success: #2ed573;
+      --mono: 'JetBrains Mono', monospace;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -28,31 +28,31 @@
     body {
       background: var(--bg-dark);
       background-image: 
-        radial-gradient(at 0% 0%, rgba(121, 40, 202, 0.15) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(0, 242, 254, 0.12) 0px, transparent 50%);
+        radial-gradient(at 0% 0%, rgba(121, 40, 202, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(0, 242, 254, 0.10) 0px, transparent 50%);
       color: var(--text-main);
       display: flex;
       height: 100vh;
       overflow: hidden;
     }
 
-    /* Sidebar Styling */
+    /* Sidebar */
     .sidebar {
-      width: 300px;
-      background: rgba(11, 15, 25, 0.85);
+      width: 290px;
+      background: rgba(8, 11, 18, 0.95);
       backdrop-filter: blur(20px);
       border-right: 1px solid var(--card-border);
-      padding: 28px 24px;
+      padding: 28px 20px;
       display: flex;
       flex-direction: column;
-      gap: 32px;
+      gap: 28px;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
-      font-size: 1.35rem;
+      gap: 12px;
+      font-size: 1.2rem;
       font-weight: 800;
       letter-spacing: -0.5px;
       background: linear-gradient(135deg, #fff 30%, var(--accent-cyan));
@@ -60,245 +60,170 @@
       -webkit-text-fill-color: transparent;
     }
 
-    .brand img { height: 38px; width: auto; filter: drop-shadow(0 0 10px rgba(0,242,254,0.3)); }
+    .brand img { height: 32px; filter: drop-shadow(0 0 10px rgba(0,242,254,0.3)); }
 
-    .nav-group { display: flex; flex-direction: column; gap: 8px; }
-    .nav-label { font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+    .nav-group { display: flex; flex-direction: column; gap: 6px; }
+    .nav-label { font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 1.5px; margin-bottom: 4px; }
     
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 14px 16px;
-      border-radius: 12px;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 10px;
       color: #94a3b8;
       font-weight: 600;
-      font-size: 0.95rem;
+      font-size: 0.88rem;
       cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.2s;
     }
 
     .nav-item:hover, .nav-item.active {
       background: rgba(88, 101, 242, 0.12);
       color: var(--accent-cyan);
       border: 1px solid rgba(0, 242, 254, 0.2);
-      box-shadow: 0 0 20px rgba(0, 242, 254, 0.1);
     }
 
-    /* Server Picker */
+    .nav-symbol { font-family: var(--mono); color: var(--accent-cyan); font-weight: 700; }
+
+    /* Target Guild Picker */
     .guild-card {
       margin-top: auto;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      padding: 16px;
-      border-radius: 16px;
+      padding: 14px;
+      border-radius: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .guild-select {
       width: 100%;
-      background: #090c14;
+      background: #080a10;
       border: 1px solid var(--card-border);
       color: #fff;
-      padding: 10px 12px;
-      border-radius: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
       font-weight: 600;
       outline: none;
-      cursor: pointer;
     }
 
-    /* Main Workspace */
+    /* Workspace Body */
     .workspace {
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 32px 40px;
+      padding: 28px 36px;
       overflow-y: auto;
-      gap: 28px;
+      gap: 20px;
     }
 
-    /* Top Search & Actions */
-    .search-bar-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
+    /* Tab Sections */
+    .tab-content { display: none; flex-direction: column; gap: 20px; }
+    .tab-content.active { display: flex; }
 
+    /* Input & Buttons */
+    .search-bar-wrapper { display: flex; gap: 12px; }
     .search-input {
       flex: 1;
       background: var(--card-bg);
-      backdrop-filter: blur(16px);
       border: 1px solid var(--card-border);
-      border-radius: 16px;
-      padding: 16px 24px;
+      border-radius: 12px;
+      padding: 14px 20px;
       color: #fff;
-      font-size: 1.05rem;
       outline: none;
-      transition: all 0.3s;
-    }
-
-    .search-input:focus {
-      border-color: var(--accent-cyan);
-      box-shadow: 0 0 25px rgba(0, 242, 254, 0.15);
     }
 
     .btn {
       background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
       color: #fff;
       border: none;
-      padding: 16px 28px;
-      border-radius: 14px;
+      padding: 14px 24px;
+      border-radius: 10px;
       font-weight: 700;
-      font-size: 0.95rem;
+      font-size: 0.88rem;
       cursor: pointer;
-      transition: all 0.25s;
-      box-shadow: 0 4px 20px rgba(121, 40, 202, 0.3);
     }
 
-    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(121, 40, 202, 0.5); }
-    .btn:active { transform: translateY(0); }
-    
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      box-shadow: none;
-    }
-    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); box-shadow: none; }
+    .btn-secondary { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); }
 
-    /* Results Grid overlay */
-    .search-results-panel {
-      display: none;
-      flex-direction: column;
-      gap: 12px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 20px;
-      padding: 20px;
-    }
-
-    .search-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: rgba(255,255,255,0.02);
-      border-radius: 12px;
-      border: 1px solid transparent;
-      transition: 0.2s;
-    }
-
-    .search-item:hover { border-color: rgba(0,242,254,0.3); background: rgba(0,242,254,0.04); }
-
-    .track-thumb { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
-
-    /* Grid layout */
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 28px;
-    }
-
+    /* Layout Grids */
+    .dashboard-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
     .card {
       background: var(--card-bg);
-      backdrop-filter: blur(16px);
       border: 1px solid var(--card-border);
-      border-radius: 24px;
-      padding: 28px;
+      border-radius: 16px;
+      padding: 22px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 18px;
     }
 
-    /* Player Console */
+    /* Deck Visualizer */
     .now-playing-stage {
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      padding: 30px;
-      background: rgba(7, 9, 14, 0.6);
-      border-radius: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      position: relative;
-      overflow: hidden;
+      padding: 20px;
+      background: rgba(4, 6, 10, 0.6);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.03);
     }
 
-    .now-playing-cover {
-      width: 180px;
-      height: 180px;
-      border-radius: 20px;
-      object-fit: cover;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-      margin-bottom: 20px;
-    }
+    .now-playing-cover { width: 140px; height: 140px; border-radius: 12px; object-fit: cover; margin-bottom: 12px; }
+    .track-name { font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 4px; }
+    .track-artist { font-size: 0.85rem; color: var(--accent-cyan); font-weight: 600; }
 
-    .track-name { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
-    .track-artist { font-size: 0.95rem; color: var(--accent-cyan); font-weight: 600; margin-bottom: 16px; }
-
-    /* Control Deck */
-    .deck-controls { display: flex; align-items: center; justify-content: center; gap: 16px; }
-
+    /* Control Buttons */
+    .deck-controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
     .control-btn {
-      width: 52px;
-      height: 52px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       border: 1px solid var(--card-border);
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.04);
       color: #fff;
-      font-size: 1.2rem;
+      font-family: var(--mono);
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: all 0.2s;
     }
+    .control-btn.active-toggle { border-color: var(--accent-cyan); background: rgba(0, 242, 254, 0.2); }
 
-    .control-btn:hover { background: rgba(0, 242, 254, 0.2); border-color: var(--accent-cyan); transform: scale(1.08); }
-    .control-btn.active-toggle { border-color: var(--accent-cyan); background: rgba(0, 242, 254, 0.25); box-shadow: 0 0 15px rgba(0,242,254,0.4); }
-
-    .volume-box {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-      background: rgba(255, 255, 255, 0.02);
-      padding: 12px 20px;
-      border-radius: 12px;
-    }
-
-    .volume-slider { flex: 1; accent-color: var(--accent-cyan); cursor: pointer; }
-
-    /* Queue System */
-    .queue-header { display: flex; justify-content: space-between; align-items: center; }
-    .queue-list { display: flex; flex-direction: column; gap: 12px; list-style: none; max-height: 480px; overflow-y: auto; }
-    
+    /* Dynamic Queue */
+    .queue-list { display: flex; flex-direction: column; gap: 8px; list-style: none; max-height: 400px; overflow-y: auto; }
     .queue-card {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 18px;
-      background: rgba(7, 9, 14, 0.5);
+      padding: 10px 14px;
+      background: rgba(4, 6, 10, 0.5);
       border: 1px solid var(--card-border);
-      border-radius: 14px;
-      transition: 0.2s;
+      border-radius: 10px;
     }
 
-    .queue-card:hover { border-color: rgba(255, 255, 255, 0.2); }
+    /* Settings UI */
+    .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--card-border); }
+    .setting-input { background: #080a10; border: 1px solid var(--card-border); color: #fff; padding: 6px 12px; border-radius: 6px; }
 
-    .remove-btn {
-      background: transparent;
-      border: none;
-      color: var(--danger);
-      font-weight: 700;
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 6px;
+    /* Logs Matrix */
+    .log-terminal {
+      background: #040508;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: #a7f3d0;
+      height: 380px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
-
-    .remove-btn:hover { background: rgba(255, 71, 87, 0.15); }
   </style>
 </head>
 <body>
@@ -306,82 +231,135 @@
   <aside class="sidebar">
     <div class="brand">
       <img src="/tab-icon.png" alt="Logo" onerror="this.style.display='none'">
-      <span>Eclipse Viper</span>
+      <span>ECLIPSE VIPER</span>
     </div>
 
     <div class="nav-group">
-      <span class="nav-label">Core Engine</span>
-      <div class="nav-item active">🎵 Live Studio Controller</div>
-      <div class="nav-item">⚙️ Guild Audio Rules</div>
-      <div class="nav-item">📊 Engine Performance</div>
+      <span class="nav-label">// ENGINE CONTROLS</span>
+      <div class="nav-item active" onclick="switchTab('studioTab', this)"><span class="nav-symbol">[#]</span> Studio Console</div>
+      <div class="nav-item" onclick="switchTab('dspTab', this)"><span class="nav-symbol">[*]</span> Audio DSP & EQ</div>
+      <div class="nav-item" onclick="switchTab('settingsTab', this)"><span class="nav-symbol">[%]</span> Server Rules</div>
+      <div class="nav-item" onclick="switchTab('logsTab', this)"><span class="nav-symbol">[!]</span> System Terminal</div>
     </div>
 
     <div class="guild-card">
-      <span class="nav-label">Target Server</span>
+      <span class="nav-label">// TARGET GUILD</span>
       <select id="guildSelect" class="guild-select" onchange="switchGuild()">
-        <option value="123456789012345678">Default Guild (123456789012345678)</option>
+        <option value="123456789012345678">Eclipse Main Guild</option>
       </select>
     </div>
   </aside>
 
   <main class="workspace">
     
-    <!-- Instant Track Search Engine -->
-    <div class="search-bar-wrapper">
-      <input type="text" id="searchInput" class="search-input" placeholder="Search tracks, artists, or paste stream links..." onkeydown="handleSearchKey(event)">
-      <button class="btn" onclick="triggerSearch()">Search Catalog</button>
-    </div>
-
-    <div id="searchPanel" class="search-results-panel">
-      <span class="nav-label">Search Results</span>
-      <div id="searchResultsList" style="display: flex; flex-direction: column; gap: 8px;"></div>
-    </div>
-
-    <div class="dashboard-grid">
-      
-      <!-- Player Console -->
-      <div class="card">
-        <span class="nav-label">Master Player</span>
-        
-        <div class="now-playing-stage">
-          <img id="coverArt" src="https://picsum.photos/seed/default/300/300" class="now-playing-cover" alt="Cover Art">
-          <div id="displayTitle" class="track-name">No Active Playback</div>
-          <div id="displayArtist" class="track-artist">Select a track or search above</div>
-        </div>
-
-        <div class="deck-controls">
-          <button class="control-btn" id="btnShuffle" onclick="sendControl('toggle_shuffle')">🔀</button>
-          <button class="control-btn" onclick="sendControl('pause')">⏸️</button>
-          <button class="control-btn" style="width: 64px; height: 64px; background: var(--accent-cyan); color: #000;" onclick="sendControl('resume')">▶️</button>
-          <button class="control-btn" onclick="sendControl('skip')">⏭️</button>
-          <button class="control-btn" id="btnRepeat" onclick="sendControl('toggle_repeat')">🔁</button>
-        </div>
-
-        <div class="volume-box">
-          <span style="font-size: 0.9rem;">🔊 Volume</span>
-          <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="80" onchange="adjustVolume(this.value)">
-          <span id="volumeVal" style="font-size: 0.85rem; width: 32px;">80%</span>
-        </div>
+    <!-- TAB 1: STUDIO CONSOLE -->
+    <div id="studioTab" class="tab-content active">
+      <div class="search-bar-wrapper">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search track or enter URL..." onkeydown="if(event.key==='Enter') triggerSearch()">
+        <button class="btn" onclick="triggerSearch()">Execute Search</button>
       </div>
 
-      <!-- Queue Deck -->
-      <div class="card">
-        <div class="queue-header">
-          <span class="nav-label">Up Next in Queue</span>
-          <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.8rem;" onclick="sendControl('clear')">Clear All</button>
-        </div>
-
-        <ul class="queue-list" id="queueList">
-          <li style="color: var(--text-muted); text-align: center; padding: 20px;">Queue is empty</li>
-        </ul>
+      <div id="searchPanel" style="display:none; flex-direction:column; gap:8px;" class="card">
+        <span class="nav-label">// MATCHING CATALOG</span>
+        <div id="searchResultsList" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
 
+      <div class="dashboard-grid">
+        <div class="card">
+          <span class="nav-label">// ACTIVE DECK</span>
+          <div class="now-playing-stage">
+            <img id="coverArt" src="https://picsum.photos/seed/default/300/300" class="now-playing-cover" alt="Cover">
+            <div id="displayTitle" class="track-name">NO ACTIVE STREAM</div>
+            <div id="displayArtist" class="track-artist">System Standby</div>
+          </div>
+          <div class="deck-controls">
+            <button class="control-btn" title="Pause" onclick="sendControl('pause')">&#10074;&#10074;</button>
+            <button class="control-btn" style="background:var(--accent-cyan); color:#000;" title="Play" onclick="sendControl('resume')">&#9654;</button>
+            <button class="control-btn" title="Skip" onclick="sendControl('skip')">&#9197;</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:0.8rem;">
+            <span>VOL</span>
+            <input type="range" id="volumeSlider" min="0" max="100" value="80" style="flex:1;" onchange="adjustVolume(this.value)">
+            <span id="volumeVal">80%</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="nav-label">// QUEUE STACK</span>
+            <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem;" onclick="sendControl('clear')">[CLEAR]</button>
+          </div>
+          <ul class="queue-list" id="queueList">
+            <li style="color:var(--text-muted); font-family:var(--mono); text-align:center;">Stack Empty</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: AUDIO DSP & EQ -->
+    <div id="dspTab" class="tab-content">
+      <div class="card">
+        <span class="nav-label">// DIGITAL SIGNAL PROCESSING</span>
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Bass Boost Hardware Filter</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Amplify lower band audio frequencies by +8dB</div>
+          </div>
+          <button id="btnBass" class="btn btn-secondary" onclick="sendControl('toggle_bass')">DISABLED</button>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Nightcore Resampler</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Increase pitch and playback rate by 1.25x</div>
+          </div>
+          <button id="btnNightcore" class="btn btn-secondary" onclick="sendControl('toggle_nightcore')">DISABLED</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: SERVER RULES -->
+    <div id="settingsTab" class="tab-content">
+      <div class="card">
+        <span class="nav-label">// GUILD AUDIO CONFIGURATION</span>
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Bot Command Prefix</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Trigger prefix for text commands</div>
+          </div>
+          <input type="text" id="settingPrefix" class="setting-input" value="!" style="width:60px;">
+        </div>
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Auto Disconnect</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Leave voice channel when queue ends</div>
+          </div>
+          <input type="checkbox" id="settingAutoDisc" checked>
+        </div>
+        <button class="btn" style="align-self:flex-start;" onclick="saveSettings()">Save Configuration</button>
+      </div>
+    </div>
+
+    <!-- TAB 4: SYSTEM TERMINAL -->
+    <div id="logsTab" class="tab-content">
+      <div class="card">
+        <span class="nav-label">// REAL-TIME ENGINE LOGS</span>
+        <div id="logTerminal" class="log-terminal">
+          <div>[SYS] Engine online.</div>
+        </div>
+      </div>
     </div>
 
   </main>
 
   <script>
     let currentGuildId = "123456789012345678";
+
+    function switchTab(tabId, el) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      el.classList.add('active');
+    }
 
     async function initGuilds() {
       try {
@@ -392,9 +370,7 @@
           select.innerHTML = data.guilds.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
           currentGuildId = data.guilds[0].id;
         }
-      } catch (e) {
-        console.warn("Using default target guild identifier");
-      }
+      } catch (e) {}
       pollState();
     }
 
@@ -403,113 +379,104 @@
       pollState();
     }
 
-    function handleSearchKey(e) {
-      if (e.key === 'Enter') triggerSearch();
-    }
-
     async function triggerSearch() {
       const q = document.getElementById('searchInput').value.trim();
       if (!q) return;
-
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-
       const panel = document.getElementById('searchPanel');
       const container = document.getElementById('searchResultsList');
-
-      if (data.results && data.results.length > 0) {
+      if (data.results) {
         panel.style.display = 'flex';
         container.innerHTML = data.results.map(item => `
-          <div class="search-item">
-            <div style="display:flex; align-items:center; gap:12px;">
-              <img src="${item.thumbnail}" class="track-thumb" alt="Thumb">
+          <div style="display:flex; justify-space-between; align-items:center; padding:8px; background:rgba(255,255,255,0.02); border-radius:8px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <img src="${item.thumbnail}" style="width:36px; height:36px; border-radius:6px;">
               <div>
-                <div style="font-weight:700; color:#fff;">${item.title}</div>
-                <div style="font-size:0.8rem; color:var(--text-muted);">${item.artist} • ${item.duration}</div>
+                <div style="font-weight:700; font-size:0.85rem;">${item.title}</div>
+                <div style="font-size:0.75rem; color:var(--text-muted);">${item.artist}</div>
               </div>
             </div>
-            <button class="btn" style="padding:8px 16px; font-size:0.85rem;" onclick="addTrack('${item.query}')">Play Track</button>
+            <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick="addTrack('${item.query}')">+ Play</button>
           </div>
         `).join('');
       }
     }
 
-    async function addTrack(queryStr) {
+    async function addTrack(q) {
       await fetch('/api/player/play', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, query: queryStr, added_by: 'Dashboard' })
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, query: q })
       });
       document.getElementById('searchPanel').style.display = 'none';
       document.getElementById('searchInput').value = '';
       pollState();
     }
 
-    async function sendControl(actionName) {
+    async function sendControl(action, val = null) {
       await fetch('/api/player/control', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, action: actionName })
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, action: action, value: val })
       });
       pollState();
     }
 
     async function adjustVolume(val) {
       document.getElementById('volumeVal').innerText = val + '%';
-      await fetch('/api/player/control', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, action: 'volume', value: parseInt(val) })
-      });
+      sendControl('volume', parseInt(val));
     }
 
     async function removeQueueIndex(idx) {
       await fetch('/api/player/remove', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, index: idx })
       });
       pollState();
     }
 
+    async function saveSettings() {
+      const prefix = document.getElementById('settingPrefix').value;
+      const autoDisc = document.getElementById('settingAutoDisc').checked;
+      await fetch('/api/guild/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, prefix: prefix, auto_disconnect: autoDisc })
+      });
+      alert('Settings Saved');
+    }
+
     async function pollState() {
-      const targetId = parseInt(currentGuildId) || 0;
-      const res = await fetch(`/api/player/state/${targetId}`);
+      const res = await fetch(`/api/player/state/${parseInt(currentGuildId) || 0}`);
       const data = await res.json();
       const st = data.state;
-
       if (!st) return;
 
       if (st.current) {
-        document.getElementById('displayTitle').innerText = st.current.title;
-        document.getElementById('displayArtist').innerText = st.current.artist + ` (Requested by ${st.current.added_by})`;
+        document.getElementById('displayTitle').innerText = st.current.title.toUpperCase();
+        document.getElementById('displayArtist').innerText = st.current.artist;
         document.getElementById('coverArt').src = st.current.thumbnail;
-      } else {
-        document.getElementById('displayTitle').innerText = 'No Active Playback';
-        document.getElementById('displayArtist').innerText = 'Select a track or search above';
       }
 
-      document.getElementById('btnShuffle').classList.toggle('active-toggle', st.shuffle);
-      document.getElementById('btnRepeat').classList.toggle('active-toggle', st.repeat);
-      document.getElementById('volumeSlider').value = st.volume;
-      document.getElementById('volumeVal').innerText = st.volume + '%';
+      document.getElementById('btnBass').innerText = st.bass_boost ? 'ENABLED' : 'DISABLED';
+      document.getElementById('btnNightcore').innerText = st.nightcore ? 'ENABLED' : 'DISABLED';
 
       const queueList = document.getElementById('queueList');
       if (st.queue && st.queue.length > 0) {
         queueList.innerHTML = st.queue.map((item, idx) => `
           <li class="queue-card">
-            <div style="display:flex; align-items:center; gap:12px;">
-              <span style="font-weight:700; color:var(--accent-cyan);">#${idx + 1}</span>
-              <div>
-                <div style="font-weight:700; color:#fff; font-size:0.9rem;">${item.title}</div>
-                <div style="font-size:0.75rem; color:var(--text-muted);">${item.added_by}</div>
-              </div>
-            </div>
-            <button class="remove-btn" onclick="removeQueueIndex(${idx})">✕</button>
+            <span style="font-family:var(--mono); color:var(--accent-cyan);">[#${idx + 1}] ${item.title}</span>
+            <button style="background:none; border:none; color:var(--danger); cursor:pointer;" onclick="removeQueueIndex(${idx})">[X]</button>
           </li>
         `).join('');
       } else {
-        queueList.innerHTML = `<li style="color: var(--text-muted); text-align: center; padding: 20px;">Queue is empty</li>`;
+        queueList.innerHTML = `<li style="color:var(--text-muted); font-family:var(--mono); text-align:center;">Stack Empty</li>`;
+      }
+
+      if (st.logs) {
+        document.getElementById('logTerminal').innerHTML = st.logs.map(l => `<div>${l}</div>`).join('');
       }
     }
 
