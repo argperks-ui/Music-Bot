@@ -69,13 +69,14 @@ app.use(session({
   cookie: { secure: true, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// 🌟 Global View Variables Middleware
+// 🌟 Global View Variables & Helpers Middleware
 app.use((req, res, next) => {
   res.locals.title = 'Git Music Dashboard';
   res.locals.active = '';
   res.locals.user = req.session.user || null;
   res.locals.hbOnline = true;
   res.locals.bot = null;
+  res.locals.appInfo = null;
   res.locals.guilds = [];
   res.locals.voice = 0;
   res.locals.apiLatency = 0;
@@ -84,6 +85,15 @@ app.use((req, res, next) => {
   res.locals.platform = process.platform;
   res.locals.memory = { heapUsed: 0, heapTotal: 0, rss: 0 };
   res.locals.memMB = 0;
+  
+  // Template helpers
+  res.locals.helpers = {
+    fmtDate: (timestamp) => {
+      if (!timestamp) return '—';
+      const d = new Date(timestamp);
+      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+  };
   
   res.locals.INVITE = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
   res.locals.configError = !BOT_TOKEN || !CLIENT_ID;
@@ -198,6 +208,7 @@ app.get('/', requireAuth, (req, res) => res.redirect('/dashboard'));
 app.get('/dashboard', requireAuth, async (req, res) => {
   try {
     const botUser = await discordFetch('/users/@me');
+    const appInfo = await discordFetch('/oauth2/applications/@me') || { id: CLIENT_ID, bot_public: true };
     const botGuilds = await discordFetch('/users/@me/guilds') || [];
     
     const totalGuilds = Array.isArray(botGuilds) ? botGuilds.length : 0;
@@ -249,6 +260,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     res.render('dashboard', {
       title: 'Dashboard',
       bot: botUser,
+      appInfo,
       guilds: botGuilds,
       botUser,
       totalGuilds,
