@@ -1,9 +1,11 @@
-LOGIN_HTML = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login | Git Music Core</title>
+  <link rel="icon" type="image/png" href="tab-icon.png">
+
   <style>
     * {
       margin: 0;
@@ -193,6 +195,7 @@ LOGIN_HTML = """<!DOCTYPE html>
       gap: 12px;
       transition: all 0.2s ease;
       box-shadow: 0 6px 24px rgba(88, 101, 242, 0.35);
+      text-decoration: none;
     }
 
     .discord-btn:hover {
@@ -299,9 +302,7 @@ LOGIN_HTML = """<!DOCTYPE html>
       <div class="spotlight" id="spotlight"></div>
       
       <div class="card-content">
-        <svg class="login-logo" viewBox="0 0 200 50">
-          <text x="10" y="35" fill="#00F0FF" font-size="28" font-weight="bold">GIT MUSIC</text>
-        </svg>
+        <img src="full-logo.png" alt="Git Music" class="login-logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 200 50\'><text x=\'10\' y=\'35\' fill=\'%2300F0FF\' font-size=\'28\' font-weight=\'bold\'>GIT MUSIC</text></svg>'">
         <p class="subtitle">Authenticate to enter the command console</p>
 
         <div class="alert-banner" id="alertBanner"></div>
@@ -325,7 +326,7 @@ LOGIN_HTML = """<!DOCTYPE html>
         <div class="tab-panel" id="tab-user">
           <form id="credentialsForm" onsubmit="handleCredentialsSubmit(event)">
             <div class="input-group">
-              <label for="username">Username</label>
+              <label for="username">Email / Username</label>
               <div class="input-wrapper">
                 <input type="text" id="username" placeholder="operator" required>
                 <svg class="input-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
@@ -352,6 +353,10 @@ LOGIN_HTML = """<!DOCTYPE html>
   </div>
 
   <script>
+    // Dynamically resolves to current host domain
+    const API_BASE = window.location.origin;
+
+    // Interactive Card Mouse Spotlight
     const card = document.getElementById('card');
     card.addEventListener('mousemove', (e) => {
       const rect = card.getBoundingClientRect();
@@ -396,7 +401,7 @@ LOGIN_HTML = """<!DOCTYPE html>
       btn.style.pointerEvents = 'none';
 
       try {
-        const response = await fetch('/api/login', {
+        const response = await fetch(`${API_BASE}/api/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
@@ -427,10 +432,12 @@ LOGIN_HTML = """<!DOCTYPE html>
       btn.style.pointerEvents = 'auto';
     }
 
+    // Triggers FastAPI Discord OAuth authorization route
     function handleDiscordOAuth() {
-      window.location.href = '/api/discord/login';
+      window.location.href = `${API_BASE}/api/discord/login`;
     }
 
+    // Canvas Background Particles
     const canvas = document.getElementById('bgCanvas');
     const ctx = canvas.getContext('2d');
     let particles = [];
@@ -475,4 +482,4 @@ LOGIN_HTML = """<!DOCTYPE html>
     animate();
   </script>
 </body>
-</html>"""
+</html>
