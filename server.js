@@ -85,6 +85,7 @@ app.use((req, res, next) => {
   res.locals.platform = process.platform;
   res.locals.memory = { heapUsed: 0, heapTotal: 0, rss: 0 };
   res.locals.memMB = 0;
+  res.locals.error = null;
   
   // Template helpers
   res.locals.helpers = {
@@ -356,6 +357,7 @@ app.get('/guild/:id', requireAuth, async (req, res) => {
       textChannels: channels.filter(c => c.type === 0 || c.type === 5),
       voiceChannels: channels.filter(c => c.type === 2),
       settings: settings || defaultSettings,
+      error: null,
       active: 'guilds'
     });
   } catch (err) {
