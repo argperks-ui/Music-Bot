@@ -1,6 +1,9 @@
 #!/bin/bash
-# Start the Node.js dashboard in the background
-node server.js &
+# 1. Build Next.js frontend into static assets
+cd viper-audio-core
+npm install
+npm run build
+cd ..
 
-# Start the Python Discord bot in the foreground
-python3 bot.py
+# 2. Launch FastAPI + Discord Bot
+python bot.py
