@@ -21,6 +21,11 @@ function isOwner(userId) {
   return ownerIds.includes(userId);
 }
 
+// ── Ensure data directory exists (Must be before Database Setup) ───────────
+if (!fs.existsSync(path.join(__dirname, 'data'))) {
+  fs.mkdirSync(path.join(__dirname, 'data'));
+}
+
 // ── Database Setup ──────────────────────────────────────────────────────────
 const db = new Database(path.join(__dirname, 'data', 'dashboard.db'));
 db.pragma('journal_mode = WAL');
@@ -503,11 +508,6 @@ io.on('connection', (socket) => {
 });
 
 // ── Startup ────────────────────────────────────────────────────────────────
-// Ensure data directory exists
-if (!fs.existsSync(path.join(__dirname, 'data'))) {
-  fs.mkdirSync(path.join(__dirname, 'data'));
-}
-
 // Log startup
 db.prepare("INSERT INTO uptime_log (event) VALUES ('startup')").run();
 
