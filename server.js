@@ -13,6 +13,10 @@ app.set('trust proxy', 1); // Fixes session cookies behind Render's proxy
 const server = http.createServer(app);
 const io = new Server(server);
 
+// ── Environment & Token Helpers ────────────────────────────────────────────
+const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.DISCORD_TOKEN || '';
+const CLIENT_ID = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
+
 // ── Multi-Owner Helper ─────────────────────────────────────────────────────
 function isOwner(userId) {
   if (!userId) return false;
@@ -65,7 +69,7 @@ app.use(session({
   cookie: { secure: true, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// 🌟 Global View Variables Middleware (Prevents all missing variable errors permanently)
+// 🌟 Global View Variables Middleware
 app.use((req, res, next) => {
   res.locals.title = 'Git Music Dashboard';
   res.locals.active = '';
@@ -79,10 +83,10 @@ app.use((req, res, next) => {
   res.locals.nodeVer = process.version;
   res.locals.platform = process.platform;
   res.locals.memory = { heapUsed: 0, heapTotal: 0, rss: 0 };
+  res.locals.memMB = 0;
   
-  const clientId = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
-  res.locals.INVITE = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`;
-  res.locals.configError = !process.env.DISCORD_BOT_TOKEN || !clientId;
+  res.locals.INVITE = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
+  res.locals.configError = !BOT_TOKEN || !CLIENT_ID;
   
   next();
 });
@@ -96,7 +100,7 @@ const DISCORD_API = 'https://discord.com/api/v10';
 
 async function discordFetch(endpoint, tokenType = 'bot') {
   const token = tokenType === 'bot' 
-    ? `Bot ${process.env.DISCORD_BOT_TOKEN}`
+    ? `Bot ${BOT_TOKEN}`
     : tokenType;
   
   const res = await fetch(`${DISCORD_API}${endpoint}`, {
@@ -128,7 +132,7 @@ app.get('/login', (req, res) => {
   }
   res.render('login', { 
     title: 'Login',
-    clientId: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
+    clientId: CLIENT_ID,
     callbackUrl: process.env.CALLBACK_URL
   });
 });
@@ -142,7 +146,7 @@ app.get('/auth/callback', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
+        client_id: CLIENT_ID,
         client_secret: process.env.DISCORD_CLIENT_SECRET || process.env.CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
@@ -171,7 +175,7 @@ app.get('/auth/callback', async (req, res) => {
     if (!isOwner(userData.id)) {
       return res.status(403).render('login', { 
         title: 'Login',
-        clientId: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
+        clientId: CLIENT_ID,
         callbackUrl: process.env.CALLBACK_URL,
         error: 'This dashboard is private. You are not authorized.'
       });
@@ -201,7 +205,6 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     let totalMembers = 0;
     let voiceConnections = 0;
     
-    // ⚡ Optimized parallel fetching with Promise.all
     if (Array.isArray(botGuilds) && botGuilds.length > 0) {
       const guildsToFetch = botGuilds.slice(0, 50);
       const guildPromises = guildsToFetch.map(g => discordFetch(`/guilds/${g.id}?with_counts=true`));
@@ -236,8 +239,9 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     const ping = Date.now() - pingStart;
 
     const memUsage = process.memoryUsage();
+    const memMB = Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100;
     const memory = {
-      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100,
+      heapUsed: memMB,
       heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024 * 100) / 100,
       rss: Math.round(memUsage.rss / 1024 / 1024 * 100) / 100
     };
@@ -256,6 +260,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       nodeVer: process.version,
       platform: process.platform,
       memory,
+      memMB,
       todayCommands,
       totalCommands,
       uptime,
@@ -272,7 +277,6 @@ app.get('/guilds', requireAuth, async (req, res) => {
   try {
     const botGuilds = await discordFetch('/users/@me/guilds') || [];
     
-    // ⚡ Optimized parallel fetching for server list page too
     const guildsToFetch = botGuilds.slice(0, 100);
     const guildPromises = guildsToFetch.map(g => discordFetch(`/guilds/${g.id}?with_counts=true`));
     const fetchedGuilds = await Promise.all(guildPromises);
@@ -421,7 +425,7 @@ app.post('/api/stats/update', (req, res) => {
   if (!command) return res.status(400).json({ error: 'command is required' });
   
   const auth = req.headers.authorization;
-  if (auth !== `Bearer ${process.env.DISCORD_BOT_TOKEN}`) {
+  if (auth !== `Bearer ${BOT_TOKEN}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   
