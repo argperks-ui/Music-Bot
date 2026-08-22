@@ -106,13 +106,13 @@ app.get('/login', (req, res) => {
     return res.redirect('/dashboard');
   }
   res.render('login', { 
-    clientId: process.env.DISCORD_CLIENT_ID,
+    clientId: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
     callbackUrl: process.env.CALLBACK_URL
   });
 });
 
-// Discord OAuth2 callback
-app.get('/auth/discord/callback', async (req, res) => {
+// Discord OAuth2 callback (Updated to /auth/callback)
+app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
   if (!code) return res.redirect('/login');
 
@@ -122,8 +122,8 @@ app.get('/auth/discord/callback', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: process.env.DISCORD_CLIENT_ID,
-        client_secret: process.env.DISCORD_CLIENT_SECRET,
+        client_id: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
+        client_secret: process.env.DISCORD_CLIENT_SECRET || process.env.CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
         redirect_uri: process.env.CALLBACK_URL,
@@ -151,7 +151,7 @@ app.get('/auth/discord/callback', async (req, res) => {
     
     if (!isOwner(userData.id)) {
       return res.status(403).render('login', { 
-        clientId: process.env.DISCORD_CLIENT_ID,
+        clientId: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID,
         callbackUrl: process.env.CALLBACK_URL,
         error: 'This dashboard is private. You are not authorized.'
       });
