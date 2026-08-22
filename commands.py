@@ -4,7 +4,7 @@ from discord.ext import commands
 import yt_dlp
 import asyncio
 
-# Configure yt-dlp to extract audio URLs safely
+# Configure yt-dlp to use cookies.txt for bot-wall bypass
 YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': True,
@@ -12,6 +12,7 @@ YDL_OPTIONS = {
     'quiet': True,
     'reconnect': '1',
     'reconnect_streamed': '1',
+    'cookiefile': 'cookies.txt',  # Automatically reads cookies from cookies.txt in root directory
 }
 
 class MusicCommands(commands.Cog):
