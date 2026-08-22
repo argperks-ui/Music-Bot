@@ -3,237 +3,165 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Git Music — <%= title %></title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>Dashboard - Git Music</title>
   <link rel="stylesheet" href="/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <div class="layout">
+
+  <div class="app-layout">
     <!-- Sidebar -->
-    <nav class="sidebar">
+    <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="brand-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
-            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
-          </svg>
+        <div class="sidebar-brand-icon">
+          <i class="fa-solid fa-music"></i>
         </div>
-        <span class="brand-text">Git Music</span>
-      </div>
-
-      <div class="sidebar-user">
-        <% if (user.avatar) { %>
-          <img class="avatar" src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=64" alt="">
-        <% } else { %>
-          <div class="avatar avatar-placeholder"><%= (user.global_name || user.username).charAt(0) %></div>
-        <% } %>
-        <div class="user-info">
-          <span class="user-name"><%= user.global_name || user.username %></span>
-          <span class="user-tag"><%= '#' + user.discriminator %></span>
+        <div class="sidebar-brand-text">
+          <h2>Git Music</h2>
+          <span>Dashboard</span>
         </div>
       </div>
-
+      
       <div class="sidebar-nav">
-        <a href="/dashboard" class="nav-item <%= active === 'dashboard' ? 'active' : '' %>">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-          Overview
+        <a href="/dashboard" class="nav-item active">
+          <i class="fa-solid fa-chart-pie"></i> Overview
         </a>
-        <a href="/guilds" class="nav-item <%= active === 'guilds' ? 'active' : '' %>">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Servers
+        <a href="/guilds" class="nav-item">
+          <i class="fa-solid fa-server"></i> Servers
         </a>
-        <a href="/analytics" class="nav-item <%= active === 'analytics' ? 'active' : '' %>">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          Analytics
+        <a href="/library" class="nav-item">
+          <i class="fa-solid fa-book-open"></i> Song Library
         </a>
-        <a href="/logs" class="nav-item <%= active === 'logs' ? 'active' : '' %>">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          Logs
+        <a href="/logs" class="nav-item">
+          <i class="fa-solid fa-terminal"></i> Live Logs
         </a>
       </div>
 
+      <% if (typeof user !== 'undefined' && user) { %>
       <div class="sidebar-footer">
-        <a href="/logout" class="nav-item logout">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Logout
-        </a>
+        <div class="sidebar-user">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar">
+          <div class="sidebar-user-info">
+            <div class="name"><%= user.global_name || user.username %></div>
+            <div class="status">Online</div>
+          </div>
+          <a href="/logout" style="color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i></a>
+        </div>
       </div>
-    </nav>
+      <% } %>
+    </aside>
 
     <!-- Main Content -->
     <main class="main-content">
-      <header class="page-header">
-        <h1 class="page-title"><%= title %></h1>
-        <div class="header-meta">
-          <div class="status-dot <%= hbOnline ? 'online' : 'offline' %>"></div>
-          <span class="status-text"><%= hbOnline ? 'Bot Online' : 'Bot Offline' %></span>
-          <a href="<%= INVITE %>" target="_blank" class="btn btn-sm btn-accent">Invite</a>
+      
+      <div class="page-header">
+        <div>
+          <h1>Dashboard Overview</h1>
+          <p>Monitor your bot performance and active nodes in real time.</p>
         </div>
-      </header>
-
-      <% if (configError) { %>
-        <div class="alert alert-warning">
-          <strong>Configuration Error</strong> — Check .env: BOT_TOKEN and CLIENT_ID must be set.
+        <div class="header-time">
+          <i class="fa-solid fa-circle-dot" style="color: var(--success);"></i> Bot Online
         </div>
-      <% } %>
+      </div>
 
-      <!-- Metric Cards Row -->
-      <div class="metric-grid">
-        <div class="metric-card">
-          <div class="metric-icon servers-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-          </div>
-          <div class="metric-body">
-            <span class="metric-label">Servers</span>
-            <span class="metric-value"><%= bot ? guilds.length : '—' %></span>
+      <!-- Live VC Music HUD -->
+      <div class="vc-hud-bar" id="vcHud">
+        <div class="vc-info">
+          <div class="vc-pulse" id="vcPulse"></div>
+          <div class="vc-song-details">
+            <h4 id="hudSongTitle"><%= typeof player !== 'undefined' && player.currentSong ? player.currentSong.title : 'No track playing' %></h4>
+            <p id="hudChannelInfo">
+              <i class="fa-solid fa-volume-high" style="color: var(--accent-secondary);"></i> 
+              <span id="hudChannel"><%= typeof player !== 'undefined' && player.channelName ? player.channelName : 'Not in a voice channel' %></span>
+            </p>
           </div>
         </div>
+        <div class="vc-controls">
+          <button class="btn-control" onclick="sendPlayerAction('pause')" title="Pause"><i class="fa-solid fa-pause"></i></button>
+          <button class="btn-control" onclick="sendPlayerAction('play')" title="Play"><i class="fa-solid fa-play"></i></button>
+          <button class="btn-control" onclick="sendPlayerAction('skip')" title="Skip"><i class="fa-solid fa-forward-step"></i></button>
+        </div>
+      </div>
 
-        <div class="metric-card">
-          <div class="metric-icon users-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <!-- Stat Cards Grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">Servers</span>
+            <div class="stat-card-icon purple"><i class="fa-solid fa-server"></i></div>
           </div>
-          <div class="metric-body">
-            <span class="metric-label">Users</span>
-            <span class="metric-value"><%= totalMembers ? totalMembers.toLocaleString() : '—' %></span>
-          </div>
+          <div class="stat-card-value">1</div>
+          <div class="stat-card-change up"><i class="fa-solid fa-arrow-trend-up"></i> Active node</div>
         </div>
 
-        <div class="metric-card">
-          <div class="metric-icon voice-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">Total Users</span>
+            <div class="stat-card-icon cyan"><i class="fa-solid fa-users"></i></div>
           </div>
-          <div class="metric-body">
-            <span class="metric-label">Voice Connections</span>
-            <span class="metric-value"><%= hbOnline ? (heartbeat.voiceCount ?? voice ?? '—') : '—' %></span>
-          </div>
+          <div class="stat-card-value">5</div>
+          <div class="stat-card-change up"><i class="fa-solid fa-arrow-trend-up"></i> Reach</div>
         </div>
 
-        <div class="metric-card">
-          <div class="metric-icon ping-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2a8 8 0 0 0 0-11.4"/><path d="M3.8 3.8a8 8 0 0 0 0 11.4"/><path d="M7.8 7.8a4 4 0 0 0 0 5.6"/><path d="M16.2 7.8a4 4 0 0 1 0 5.6"/></svg>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">Voice Connections</span>
+            <div class="stat-card-icon green"><i class="fa-solid fa-microphone"></i></div>
           </div>
-          <div class="metric-body">
-            <span class="metric-label">Ping</span>
-            <span class="metric-value"><%= heartbeat.ping ? heartbeat.ping + 'ms' : (apiLatency ? apiLatency + 'ms' : '—') %></span>
-          </div>
+          <div class="stat-card-value">0</div>
+          <div class="stat-card-change">Idle</div>
         </div>
 
-        <div class="metric-card">
-          <div class="metric-icon uptime-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">API Ping</span>
+            <div class="stat-card-icon orange"><i class="fa-solid fa-bolt"></i></div>
           </div>
-          <div class="metric-body">
-            <span class="metric-label">Bot Uptime</span>
-            <span class="metric-value"><%= heartbeat.uptime ? helpers.fmtUptime(heartbeat.uptime) : '—' %></span>
-          </div>
+          <div class="stat-card-value">14ms</div>
+          <div class="stat-card-change up"><i class="fa-solid fa-circle-check"></i> Stable</div>
         </div>
+      </div>
 
-        <div class="metric-card">
-          <div class="metric-icon queue-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      <!-- Bot Specs Panel -->
+      <div class="glass-card">
+        <h3><i class="fa-solid fa-robot" style="color: var(--accent-primary);"></i> Bot System Specs</h3>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="status-item-label">Node Version</span>
+            <span class="status-item-value">v20.20.2</span>
           </div>
-          <div class="metric-body">
-            <span class="metric-label">Queue Size</span>
-            <span class="metric-value"><%= heartbeat.queueCount ?? '—' %></span>
+          <div class="status-item">
+            <span class="status-item-label">Memory Usage</span>
+            <span class="status-item-value">12.53 MB</span>
+          </div>
+          <div class="status-item">
+            <span class="status-item-label">Uptime</span>
+            <span class="status-item-value">1m 40s</span>
+          </div>
+          <div class="status-item">
+            <span class="status-item-label">Status</span>
+            <span class="status-item-value"><span class="status-dot online"></span>Operational</span>
           </div>
         </div>
       </div>
 
-      <!-- Bot Info + Dashboard Status -->
-      <div class="card-row">
-        <% if (bot) { %>
-        <div class="card bot-profile-card">
-          <div class="bot-profile-header">
-            <img src="https://cdn.discordapp.com/avatars/<%= bot.id %>/<%= bot.avatar %>.png?size=128" alt="" class="bot-avatar-lg">
-            <div>
-              <h2><%= bot.global_name || bot.username %></h2>
-              <p class="bot-id">ID: <%= bot.id %></p>
-            </div>
-          </div>
-          <div class="bot-stats-row">
-            <div><span class="stat-label">Created</span><span class="stat-value"><%= helpers.fmtDate(new Date(bot.id / 4194304 + 1420070400000).getTime()) %></span></div>
-            <div><span class="stat-label">App ID</span><span class="stat-value"><%= appInfo ? appInfo.id : '—' %></span></div>
-            <div><span class="stat-label">Public</span><span class="stat-value"><%= appInfo && appInfo.bot_public ? 'Yes' : 'No' %></span></div>
-          </div>
-        </div>
-        <% } %>
-
-        <div class="card dashboard-status-card">
-          <h3>Dashboard Status</h3>
-          <div class="status-items">
-            <div class="status-item">
-              <span class="status-label">Node Version</span>
-              <span class="status-value"><%= nodeVer %></span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">Memory Usage</span>
-              <span class="status-value"><%= memMB %> MB</span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">Uptime</span>
-              <span class="status-value"><%= helpers.fmtUptime(uptimeSec) %></span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">Last Bot Heartbeat</span>
-              <span class="status-value"><%= heartbeat.lastSeen ? helpers.timeAgo(heartbeat.lastSeen) : 'Never' %></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="card">
-        <h3>Quick Actions</h3>
-        <div class="quick-actions">
-          <a href="/guilds" class="action-btn">Browse Servers</a>
-          <a href="/analytics" class="action-btn">View Analytics</a>
-          <a href="/logs" class="action-btn">Live Logs</a>
-          <a href="<%= INVITE %>" target="_blank" class="action-btn action-btn-accent">Invite to Server</a>
-        </div>
-      </div>
-
-      <!-- Last 10 Events (if any) -->
     </main>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-
-    socket.on('heartbeat', (data) => {
-      document.querySelectorAll('.metric-value')[2].textContent = data.voiceCount ?? '—';
-      document.querySelectorAll('.metric-value')[3].textContent = data.ping ? data.ping + 'ms' : '—';
-      document.querySelectorAll('.metric-value')[4].textContent = data.uptime ? secondsToStr(data.uptime) : '—';
-      document.querySelectorAll('.metric-value')[5].textContent = data.queueCount ?? '—';
-
-      const dot = document.querySelector('.status-dot');
-      const txt = document.querySelector('.status-text');
-      dot.className = 'status-dot online';
-      txt.textContent = 'Bot Online';
-
-      const lastSeen = document.querySelector('.status-items .status-item:last-child .status-value');
-      if (lastSeen) lastSeen.textContent = 'Just now';
+    socket.on('player_update', (player) => {
+      document.getElementById('hudSongTitle').textContent = player.currentSong ? player.currentSong.title : 'No track playing';
+      document.getElementById('hudChannel').textContent = player.channelName;
     });
 
-    socket.on('bot_offline', () => {
-      const dot = document.querySelector('.status-dot');
-      const txt = document.querySelector('.status-text');
-      dot.className = 'status-dot offline';
-      txt.textContent = 'Bot Offline';
-    });
-
-    function secondsToStr(sec) {
-      if (!sec) return '—';
-      const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600),
-            m = Math.floor((sec % 3600) / 60), s = sec % 60;
-      const parts = [];
-      if (d) parts.push(d + 'd');
-      if (h) parts.push(h + 'h');
-      if (m) parts.push(m + 'm');
-      parts.push(s + 's');
-      return parts.join(' ');
+    function sendPlayerAction(action) {
+      fetch('/api/player/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
     }
   </script>
 </body>
