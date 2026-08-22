@@ -3,7 +3,16 @@ from discord import app_commands
 from discord.ext import commands
 import yt_dlp
 import asyncio
-import dashboard
+
+# Safe logging fallback so the bot never crashes if dashboard changes
+try:
+    import dashboard
+except ImportError:
+    class DummyDashboard:
+        current_song = "None"
+        volume_level = 50
+        def add_log(self, msg): print(f"[Log]: {msg}")
+    dashboard = DummyDashboard()
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -51,11 +60,9 @@ class MusicControlView(discord.ui.View):
             return await interaction.response.send_message("❌ Bot is not connected.", ephemeral=True)
         if vc.is_playing():
             vc.pause()
-            dashboard.add_log(f"Discord button: Paused music in {interaction.guild.name}")
             await interaction.response.send_message("⏸️ Paused the music.", ephemeral=True)
         elif vc.is_paused():
             vc.resume()
-            dashboard.add_log(f"Discord button: Resumed music in {interaction.guild.name}")
             await interaction.response.send_message("▶️ Resumed the music.", ephemeral=True)
         else:
             await interaction.response.send_message("❌ Nothing is playing.", ephemeral=True)
@@ -65,7 +72,6 @@ class MusicControlView(discord.ui.View):
         vc = interaction.guild.voice_client
         if vc and vc.is_playing():
             vc.stop()
-            dashboard.add_log(f"Discord button: Skipped track in {interaction.guild.name}")
             await interaction.response.send_message("⏭️ Skipped the song!", ephemeral=True)
         else:
             await interaction.response.send_message("❌ Nothing to skip.", ephemeral=True)
@@ -75,8 +81,6 @@ class MusicControlView(discord.ui.View):
         vc = interaction.guild.voice_client
         if vc:
             await vc.disconnect()
-            dashboard.current_song = "None"
-            dashboard.add_log(f"Discord button: Disconnected from {interaction.guild.name}")
             await interaction.response.send_message("⏹️ Disconnected from the voice channel.", ephemeral=True)
         else:
             await interaction.response.send_message("❌ I'm not in a voice channel.", ephemeral=True)
@@ -97,7 +101,6 @@ class MusicCommands(commands.Cog):
         else:
             await channel.connect()
         
-        dashboard.add_log(f"Joined voice channel: {channel.name} in {interaction.guild.name}")
         await interaction.followup.send(f'🔊 Joined **{channel.name}**!')
 
     @app_commands.command(name="play", description="Play a song or search query")
@@ -113,10 +116,16 @@ class MusicCommands(commands.Cog):
             vc = await interaction.user.voice.channel.connect()
 
         try:
-            player = await YTDLSource.from_url(query, loop=self.bot.loop, stream=True)
-            dashboard.current_song = player.title
-            dashboard.add_log(f"Now Playing: {player.title} ({interaction.guild.name})")
+            player = await asyncio.wait_for(
+                YTDLSource.from_url(query, loop=self.bot.loop, stream=True),
+                timeout=10.0
+            )
             
+            try:
+                dashboard.current_song = player.title
+            except AttributeError:
+                pass
+
             if vc.is_playing() or vc.is_paused():
                 vc.stop()
                 
@@ -130,8 +139,10 @@ class MusicCommands(commands.Cog):
             embed.set_footer(text=f"Requested by {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
             
             await interaction.followup.send(embed=embed, view=MusicControlView())
+            
+        except asyncio.TimeoutError:
+            await interaction.followup.send("❌ **Request timed out!** YouTube took too long to respond.")
         except Exception as e:
-            dashboard.add_log(f"Playback error: {e}")
             await interaction.followup.send(f"❌ Error playing song: `{e}`")
 
     @app_commands.command(name="pause", description="Pause the current song")
@@ -140,7 +151,6 @@ class MusicCommands(commands.Cog):
         vc = interaction.guild.voice_client
         if vc and vc.is_playing():
             vc.pause()
-            dashboard.add_log("Paused playback via slash command.")
             await interaction.followup.send("⏸️ Paused the music.")
         else:
             await interaction.followup.send("❌ Nothing is playing right now.")
@@ -151,7 +161,6 @@ class MusicCommands(commands.Cog):
         vc = interaction.guild.voice_client
         if vc and vc.is_paused():
             vc.resume()
-            dashboard.add_log("Resumed playback via slash command.")
             await interaction.followup.send("▶️ Resumed the music.")
         else:
             await interaction.followup.send("❌ The music is not paused.")
@@ -162,7 +171,6 @@ class MusicCommands(commands.Cog):
         vc = interaction.guild.voice_client
         if vc and vc.is_playing():
             vc.stop()
-            dashboard.add_log("Skipped track via slash command.")
             await interaction.followup.send("⏭️ Skipped the song!")
         else:
             await interaction.followup.send("❌ Nothing to skip.")
@@ -179,8 +187,6 @@ class MusicCommands(commands.Cog):
             return await interaction.followup.send("❌ Volume must be between 0 and 100.")
         
         vc.source.volume = volume / 100.0
-        dashboard.volume_level = volume
-        dashboard.add_log(f"Volume adjusted to {volume}% via slash command.")
         await interaction.followup.send(f"🔊 Volume set to **{volume}%**")
 
     @app_commands.command(name="stop", description="Stop music and disconnect")
@@ -189,8 +195,10 @@ class MusicCommands(commands.Cog):
         vc = interaction.guild.voice_client
         if vc:
             await vc.disconnect()
-            dashboard.current_song = "None"
-            dashboard.add_log("Disconnected via slash command.")
+            try:
+                dashboard.current_song = "None"
+            except AttributeError:
+                pass
             await interaction.followup.send("⏹️ Disconnected from the voice channel.")
         else:
             await interaction.followup.send("❌ I'm not in a voice channel.")
