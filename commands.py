@@ -1,23 +1,10 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import yt_dlp
+import deezer
 import asyncio
 
-# Configure yt-dlp to use iOS/TV client fallback to bypass bot walls without cookies
-YDL_OPTIONS = {
-    'format': 'bestaudio/best',
-    'noplaylist': True,
-    'default_search': 'ytsearch1',
-    'quiet': True,
-    'reconnect': '1',
-    'reconnect_streamed': '1',
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['ios', 'tv']
-        }
-    }
-}
+client = deezer.Client()
 
 class MusicCommands(commands.Cog):
     def __init__(self, bot):
@@ -48,8 +35,8 @@ class MusicCommands(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to connect: {str(e)}", ephemeral=True)
 
-    @app_commands.command(name="play", description="Search and stream a real track into your voice channel.")
-    @app_commands.describe(query="The song name, artist, or YouTube URL")
+    @app_commands.command(name="play", description="Search and stream a track via Deezer into your voice channel.")
+    @app_commands.describe(query="The song name or artist")
     async def slash_play(self, interaction: discord.Interaction, query: str):
         await interaction.response.defer()
         guild = interaction.guild
@@ -71,29 +58,31 @@ class MusicCommands(commands.Cog):
         
         voice_client = guild.voice_client
 
-        # 2. Extract track info using yt-dlp in a background thread to prevent blocking
+        # 2. Search track using Deezer API in a background thread
         try:
             loop = asyncio.get_running_loop()
-            data = await loop.run_in_executor(
-                None, lambda: yt_dlp.YoutubeDL(YDL_OPTIONS).extract_info(query, download=False)
+            results = await loop.run_in_executor(
+                None, lambda: client.search(query)
             )
             
-            if 'entries' in data:
-                data = data['entries'][0]
+            if not results:
+                await interaction.followup.send(f"❌ No tracks found on Deezer for **'{query}'**.")
+                return
                 
-            song_url = data.get('url')
-            title = data.get('title', query)
-            duration_sec = data.get('duration', 210)
-            thumbnail = data.get('thumbnail', f"https://picsum.photos/seed/{abs(hash(query))}/300/300")
+            track = results[0]
+            song_url = track.preview  # Deezer provides direct streamable preview MP3 URLs
+            title = f"{track.title} - {track.artist.name}"
+            duration_sec = track.duration or 30
+            thumbnail = track.album.cover_medium if track.album else f"https://picsum.photos/seed/{abs(hash(query))}/300/300"
         except Exception as e:
-            st["logs"].append(f"[ERROR] yt-dlp extraction failed: {e}")
-            await interaction.followup.send(f"❌ Could not extract audio for **'{query}'**: {e}")
+            st["logs"].append(f"[ERROR] Deezer search failed: {e}")
+            await interaction.followup.send(f"❌ Deezer error: {e}")
             return
 
         track_item = {
             "id": f"trk_{abs(hash(title)) & 0xffffff}",
             "title": title,
-            "artist": data.get('uploader', 'YouTube Stream'),
+            "artist": track.artist.name,
             "duration": f"{duration_sec // 60}:{duration_sec % 60:02d}",
             "duration_sec": duration_sec,
             "position_sec": 0,
@@ -106,7 +95,7 @@ class MusicCommands(commands.Cog):
             st["current"] = track_item
             st["is_playing"] = True
             st["is_paused"] = False
-            st["logs"].append(f"[EXEC] Now streaming: '{title}'")
+            st["logs"].append(f"[EXEC] Now streaming from Deezer: '{title}'")
 
             try:
                 FFMPEG_OPTIONS = {
@@ -121,7 +110,7 @@ class MusicCommands(commands.Cog):
                     st["is_playing"] = False
 
                 voice_client.play(source, after=after_playing)
-                await interaction.followup.send(f"▶️ Now streaming: **{title}**")
+                await interaction.followup.send(f"▶️ Now streaming from Deezer: **{title}**")
             except Exception as e:
                 st["logs"].append(f"[ERROR] FFmpeg playback failed: {e}")
                 await interaction.followup.send(f"⚠️ Failed to start audio stream: {e}")
