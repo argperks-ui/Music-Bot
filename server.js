@@ -9,7 +9,7 @@ const { Server } = require('socket.io');
 const Database = require('better-sqlite3');
 
 const app = express();
-app.set('trust proxy', 1); // 👈 Added to fix the login/session loop on Render
+app.set('trust proxy', 1); // Fixes session cookies behind Render's proxy
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -186,7 +186,7 @@ app.get('/', requireAuth, (req, res) => res.redirect('/dashboard'));
 app.get('/dashboard', requireAuth, async (req, res) => {
   try {
     const botUser = await discordFetch('/users/@me');
-    const botGuilds = await discordFetch('/users/@me/guilds');
+    const botGuilds = await discordFetch('/users/@me/guilds') || [];
     
     const totalGuilds = Array.isArray(botGuilds) ? botGuilds.length : 0;
     
@@ -224,6 +224,8 @@ app.get('/dashboard', requireAuth, async (req, res) => {
 
     res.render('dashboard', {
       title: 'Dashboard',
+      bot: botUser,
+      guilds: botGuilds,
       botUser,
       totalGuilds,
       totalMembers,
