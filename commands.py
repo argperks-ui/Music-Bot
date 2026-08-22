@@ -294,8 +294,13 @@ class MusicCommands(commands.Cog):
         st["active_vc_id"] = str(channel.id)
         await interaction.response.send_message(embed=self.git_embed("Connected", f"🔊 Joined **{channel.name}**."))
 
-    for alias in ["summon", "connect"]:
-        locals()[alias] = app_commands.command(name=alias, description=f"Alias for /join")(join)
+    @app_commands.command(name="summon", description="Alias for /join")
+    async def summon(self, interaction: discord.Interaction):
+        await self.join.callback(self, interaction)
+
+    @app_commands.command(name="connect", description="Alias for /join")
+    async def connect(self, interaction: discord.Interaction):
+        await self.join.callback(self, interaction)
 
     @app_commands.command(name="leave", description="Disconnects bot from voice channel.")
     async def leave(self, interaction: discord.Interaction):
@@ -307,8 +312,17 @@ class MusicCommands(commands.Cog):
             await guild.voice_client.disconnect()
         await interaction.response.send_message(embed=self.git_embed("Disconnected", "👋 Left the voice channel."))
 
-    for alias in ["disconnect", "dc", "fuckoff"]:
-        locals()[alias] = app_commands.command(name=alias, description=f"Alias for /leave")(leave)
+    @app_commands.command(name="disconnect", description="Alias for /leave")
+    async def disconnect_cmd(self, interaction: discord.Interaction):
+        await self.leave.callback(self, interaction)
+
+    @app_commands.command(name="dc", description="Alias for /leave")
+    async def dc(self, interaction: discord.Interaction):
+        await self.leave.callback(self, interaction)
+
+    @app_commands.command(name="fuckoff", description="Alias for /leave")
+    async def fuckoff(self, interaction: discord.Interaction):
+        await self.leave.callback(self, interaction)
 
     @app_commands.command(name="loop", description="Toggles loop mode for the current track.")
     async def loop(self, interaction: discord.Interaction):
@@ -356,8 +370,13 @@ class MusicCommands(commands.Cog):
         USER_LIKES.add(current["title"])
         await interaction.response.send_message(embed=self.git_embed("Liked", f"❤️ Added **{current['title']}** to your favorites!"))
 
-    for alias in ["love", "grab"]:
-        locals()[alias] = app_commands.command(name=alias, description=f"Alias for /like")(like)
+    @app_commands.command(name="love", description="Alias for /like")
+    async def love(self, interaction: discord.Interaction):
+        await self.like.callback(self, interaction)
+
+    @app_commands.command(name="grab", description="Alias for /like")
+    async def grab(self, interaction: discord.Interaction):
+        await self.like.callback(self, interaction)
 
     @app_commands.command(name="liked", description="View your favorite liked tracks.")
     async def liked(self, interaction: discord.Interaction):

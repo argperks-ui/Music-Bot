@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login | Git Music Core</title>
-  <link rel="icon" type="image/png" href="tab-icon.png">
+  <link rel="icon" type="image/png" href="/static/tab-icon.png">
 
   <style>
     * {
@@ -353,10 +353,8 @@
   </div>
 
   <script>
-    // Dynamically resolves to current host domain
     const API_BASE = window.location.origin;
 
-    // Interactive Card Mouse Spotlight
     const card = document.getElementById('card');
     card.addEventListener('mousemove', (e) => {
       const rect = card.getBoundingClientRect();
@@ -432,12 +430,10 @@
       btn.style.pointerEvents = 'auto';
     }
 
-    // Triggers FastAPI Discord OAuth authorization route
     function handleDiscordOAuth() {
       window.location.href = `${API_BASE}/api/discord/login`;
     }
 
-    // Canvas Background Particles
     const canvas = document.getElementById('bgCanvas');
     const ctx = canvas.getContext('2d');
     let particles = [];
