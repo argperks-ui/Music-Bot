@@ -1,10 +1,9 @@
 import os
 import asyncio
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -38,6 +37,8 @@ def get_or_create_state(guild_id: int) -> Dict[str, Any]:
                 "title": "Git Music Studio Stream",
                 "artist": "Verified Audio Core",
                 "duration": "3:45",
+                "duration_sec": 225,
+                "position_sec": 42,
                 "thumbnail": "https://picsum.photos/seed/gitmusic/300/300",
                 "added_by": "System"
             },
@@ -50,6 +51,9 @@ def get_or_create_state(guild_id: int) -> Dict[str, Any]:
             "bass": 0,
             "mid": 0,
             "treble": 0,
+            "crossfader": 0,
+            "scratch_mode": False,
+            "filter_cutoff": 20000,
             "active_vc_id": None,
             "logs": ["[SYS] Git Music audio engine initialized successfully."]
         }
@@ -62,6 +66,9 @@ def get_or_create_settings(guild_id: int) -> Dict[str, Any]:
             "auto_disconnect": True,
             "announce_songs": True,
             "dj_only_mode": False,
+            "max_queue_size": 100,
+            "default_volume": 80,
+            "24_7_mode": False,
             "target_vc": None
         }
     return guild_settings[guild_id]
@@ -87,6 +94,9 @@ class SettingsRequest(BaseModel):
     auto_disconnect: Optional[bool] = True
     announce_songs: Optional[bool] = True
     dj_only_mode: Optional[bool] = False
+    max_queue_size: Optional[int] = 100
+    default_volume: Optional[int] = 80
+    24_7_mode: Optional[bool] = False
     target_vc: Optional[str] = None
 
 class DspRequest(BaseModel):
@@ -96,6 +106,8 @@ class DspRequest(BaseModel):
     bass: Optional[int] = 0
     mid: Optional[int] = 0
     treble: Optional[int] = 0
+    crossfader: Optional[int] = 0
+    scratch_mode: Optional[bool] = False
 
 if bot:
     @bot.event
@@ -171,6 +183,7 @@ async def search_tracks(q: str = Query(..., min_length=1)):
                 "title": f"{clean.title()} (Master Cut)",
                 "artist": "Verified Stream",
                 "duration": "3:45",
+                "duration_sec": 225,
                 "thumbnail": f"https://picsum.photos/seed/{abs(hash(clean))}/300/300",
                 "query": clean
             },
@@ -179,6 +192,7 @@ async def search_tracks(q: str = Query(..., min_length=1)):
                 "title": f"{clean.title()} (Git Music Remix)",
                 "artist": "Studio Audio Lab",
                 "duration": "4:12",
+                "duration_sec": 252,
                 "thumbnail": f"https://picsum.photos/seed/{abs(hash(clean + 'remix'))}/300/300",
                 "query": f"{clean} remix"
             }
@@ -189,6 +203,8 @@ async def search_tracks(q: str = Query(..., min_length=1)):
 async def get_player_state(guild_id: int):
     st = get_or_create_state(guild_id)
     sett = get_or_create_settings(guild_id)
+    if st["is_playing"] and not st["is_paused"] and st["current"]:
+        st["position_sec"] = min(st["current"].get("duration_sec", 225), st["position_sec"] + 2)
     return {"state": st, "settings": sett}
 
 @app.post("/api/player/play")
@@ -199,12 +215,14 @@ async def api_play_track(req: PlayRequest):
         "title": req.query.title(),
         "artist": "Dashboard Stream",
         "duration": "3:30",
+        "duration_sec": 210,
         "thumbnail": f"https://picsum.photos/seed/{abs(hash(req.query))}/300/300",
         "added_by": req.added_by
     }
 
     if not st["current"] or not st["is_playing"]:
         st["current"] = track_item
+        st["position_sec"] = 0
         st["is_playing"] = True
         st["is_paused"] = False
         st["logs"].append(f"[EXEC] Now streaming '{track_item['title']}'")
@@ -233,6 +251,7 @@ async def api_control_player(req: ControlRequest):
     elif action == "skip":
         if st["queue"]:
             st["current"] = st["queue"].pop(0)
+            st["position_sec"] = 0
             st["is_playing"] = True
             st["is_paused"] = False
             msg = f"Skipped to '{st['current']['title']}'"
@@ -244,6 +263,12 @@ async def api_control_player(req: ControlRequest):
         st["queue"] = []
         msg = "Queue stack cleared."
         st["logs"].append("[CTRL] Queue stack wiped.")
+    elif action == "seek" and req.value is not None:
+        if st["current"]:
+            target = max(0, min(st["current"].get("duration_sec", 225), int(req.value)))
+            st["position_sec"] = target
+            msg = f"Seek position set to {target}s"
+            st["logs"].append(f"[CTRL] Track position jumped to {target}s.")
     elif action == "volume" and req.value is not None:
         st["volume"] = max(0, min(100, int(req.value)))
         msg = f"Master Volume set to {st['volume']}%"
@@ -251,7 +276,29 @@ async def api_control_player(req: ControlRequest):
     elif action == "join_vc" and req.value:
         st["active_vc_id"] = str(req.value)
         msg = f"Bot connected to voice channel ID: {req.value}"
-        st["logs"].append(f"[VC] Engine bound to channel ID: {req.value}")
+        
+        # Connect actual bot instance to Discord Voice Channel
+        if bot:
+            guild = bot.get_guild(req.guild_id)
+            if guild:
+                channel = guild.get_channel(int(req.value))
+                if channel and isinstance(channel, discord.VoiceChannel):
+                    try:
+                        # Check if already connected, move if necessary
+                        if guild.voice_client:
+                            await guild.voice_client.move_to(channel)
+                        else:
+                            await channel.connect()
+                        st["logs"].append(f"[VC] Successfully connected to #{channel.name}")
+                    except Exception as e:
+                        msg = f"Failed to connect to VC: {str(e)}"
+                        st["logs"].append(f"[ERROR] VC connection error: {str(e)}")
+                else:
+                    msg = "Voice channel not found or invalid."
+            else:
+                msg = "Bot is not in the specified Discord guild."
+        else:
+            st["logs"].append(f"[VC] Engine bound to channel ID: {req.value} (Mock Mode)")
 
     return {"status": "success", "state": st, "message": msg}
 
@@ -263,9 +310,11 @@ async def api_update_dsp(req: DspRequest):
     if req.bass is not None: st["bass"] = int(req.bass)
     if req.mid is not None: st["mid"] = int(req.mid)
     if req.treble is not None: st["treble"] = int(req.treble)
+    if req.crossfader is not None: st["crossfader"] = int(req.crossfader)
+    if req.scratch_mode is not None: st["scratch_mode"] = bool(req.scratch_mode)
     
-    st["logs"].append(f"[DSP] Profile updated - Pitch: {st['pitch']}x | Speed: {st['speed']}x | EQ: {st['bass']}dB/{st['mid']}dB/{st['treble']}dB")
-    return {"status": "success", "state": st, "message": "DSP Audio Processing Profile Updated"}
+    st["logs"].append(f"[DJ] Deck Mixer Sync - Pitch: {st['pitch']}x | Crossfader: {st['crossfader']} | Scratch: {st['scratch_mode']}")
+    return {"status": "success", "state": st, "message": "DJ Mixer & DSP Profile Synchronized"}
 
 @app.post("/api/player/remove")
 async def api_remove_queue_item(req: RemoveRequest):
@@ -283,6 +332,9 @@ async def api_update_settings(req: SettingsRequest):
     sett["auto_disconnect"] = req.auto_disconnect
     sett["announce_songs"] = req.announce_songs
     sett["dj_only_mode"] = req.dj_only_mode
+    sett["max_queue_size"] = req.max_queue_size
+    sett["default_volume"] = req.default_volume
+    sett["24_7_mode"] = req["24_7_mode"] if hasattr(req, "24_7_mode") else sett["24_7_mode"]
     sett["target_vc"] = req.target_vc
     return {"status": "success", "settings": sett, "message": "Guild configuration synchronized"}
 

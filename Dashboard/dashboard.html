@@ -256,6 +256,36 @@
       cursor: pointer;
     }
 
+    /* Progress Bar */
+    .progress-container { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+    .progress-bar-wrapper {
+      position: relative;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .progress-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan));
+      border-radius: 3px;
+      width: 0%;
+      pointer-events: none;
+    }
+    .progress-input {
+      position: absolute;
+      top: -4px;
+      left: 0;
+      width: 100%;
+      height: 14px;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .progress-times { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.72rem; color: var(--text-muted); }
+
     .queue-list { display: flex; flex-direction: column; gap: 8px; list-style: none; max-height: 400px; overflow-y: auto; }
     .queue-card {
       display: flex;
@@ -301,6 +331,7 @@
     <div class="nav-group">
       <span class="nav-label">// ENGINE CONTROLS</span>
       <div class="nav-item active" onclick="switchTab('studioTab', this)"><span class="nav-symbol">[#]</span> Studio Console</div>
+      <div class="nav-item" onclick="switchTab('djTab', this)"><span class="nav-symbol">[🎧]</span> DJ Mixer Deck</div>
       <div class="nav-item" onclick="switchTab('dspTab', this)"><span class="nav-symbol">[*]</span> DSP & Equalizer</div>
       <div class="nav-item" onclick="switchTab('settingsTab', this)"><span class="nav-symbol">[%]</span> Server Rules</div>
       <div class="nav-item" onclick="switchTab('logsTab', this)"><span class="nav-symbol">[!]</span> System Terminal</div>
@@ -341,6 +372,18 @@
             <div id="displayArtist" class="track-artist">Verified Audio Core</div>
           </div>
           
+          <!-- Live Progress Bar -->
+          <div class="progress-container">
+            <div class="progress-bar-wrapper">
+              <div id="progressFill" class="progress-fill"></div>
+              <input type="range" id="progressSlider" class="progress-input" min="0" max="225" value="0" onchange="seekTrack(this.value)">
+            </div>
+            <div class="progress-times">
+              <span id="currentTimeText">0:00</span>
+              <span id="durationText">3:45</span>
+            </div>
+          </div>
+
           <div class="deck-controls">
             <button class="control-btn" title="Pause" onclick="sendControl('pause')">&#10074;&#10074;</button>
             <button class="control-btn" style="background:var(--accent-cyan); color:#000;" title="Play" onclick="sendControl('resume')">&#9654;</button>
@@ -377,7 +420,51 @@
       </div>
     </div>
 
-    <!-- TAB 2: DSP & EQUALIZER -->
+    <!-- TAB 2: DJ MIXER DECK -->
+    <div id="djTab" class="tab-content">
+      <div class="card" style="background: linear-gradient(135deg, rgba(13,18,30,0.95), rgba(88,101,242,0.15));">
+        <span class="nav-label">// LIVE DJ TURNTABLE MIXER SUITE</span>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 10px;">
+          
+          <!-- Deck A -->
+          <div style="background:rgba(4,6,10,0.6); padding:16px; border-radius:12px; border:1px solid var(--card-border); display:flex; flex-direction:column; gap:12px; text-align:center;">
+            <span class="nav-label">DECK A (MASTER ACTIVE)</span>
+            <div style="font-weight:800; font-size:0.95srem;" id="deckAName">Git Music Studio Stream</div>
+            <button class="btn" style="background:var(--success); font-size:0.75rem; padding:8px;" onclick="showNotification('DECK A', 'Deck A locked as live output source.', 'success')">Live Deck A</button>
+          </div>
+
+          <!-- Deck B -->
+          <div style="background:rgba(4,6,10,0.6); padding:16px; border-radius:12px; border:1px solid var(--card-border); display:flex; flex-direction:column; gap:12px; text-align:center;">
+            <span class="nav-label">DECK B (CUE / PREVIEW)</span>
+            <div style="font-weight:800; font-size:0.95rem; color:var(--text-muted);">Queue Ready Standby</div>
+            <button class="btn btn-secondary" style="font-size:0.75rem; padding:8px;" onclick="showNotification('DECK B', 'Cue loaded into Deck B preview channel.', 'info')">Preview Deck B</button>
+          </div>
+
+        </div>
+
+        <div class="setting-row" style="margin-top:10px;">
+          <div>
+            <div style="font-weight:700;">A/B Crossfader Blend</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Crossfade audio between Deck A and Deck B</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; font-family:var(--mono);">
+            <span>A</span>
+            <input type="range" id="crossfaderSlider" min="-50" max="50" step="1" value="0" onchange="updateDjMixer()">
+            <span>B</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Vinyl Scratch Simulator</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Apply scratch filter modulation to active stream</div>
+          </div>
+          <input type="checkbox" id="scratchToggle" onchange="updateDjMixer()">
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: DSP & EQUALIZER -->
     <div id="dspTab" class="tab-content">
       <div class="card">
         <span class="nav-label">// HARDWARE AUDIO PITCH & TEMPO PROCESSING</span>
@@ -440,7 +527,7 @@
       </div>
     </div>
 
-    <!-- TAB 3: SERVER RULES -->
+    <!-- TAB 4: SERVER RULES -->
     <div id="settingsTab" class="tab-content">
       <div class="card">
         <span class="nav-label">// GUILD AUDIO CONFIGURATION</span>
@@ -458,11 +545,39 @@
           </div>
           <input type="checkbox" id="settingAutoDisc" checked>
         </div>
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Song Announcement Embeds</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Send rich card when a new track plays</div>
+          </div>
+          <input type="checkbox" id="settingAnnounce" checked>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">DJ Only Mode</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Restrict playback controls to DJ role members</div>
+          </div>
+          <input type="checkbox" id="settingDjOnly">
+        </div>
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">24/7 Stay Mode</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Keep bot connected to voice indefinitely</div>
+          </div>
+          <input type="checkbox" id="setting247">
+        </div>
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Maximum Queue Capacity</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Limit total enqueued tracks per server</div>
+          </div>
+          <input type="number" id="settingMaxQueue" class="setting-input" value="100" style="width:80px;">
+        </div>
         <button class="btn" style="align-self:flex-start;" onclick="saveSettings()">Save Configuration</button>
       </div>
     </div>
 
-    <!-- TAB 4: SYSTEM TERMINAL -->
+    <!-- TAB 5: SYSTEM TERMINAL -->
     <div id="logsTab" class="tab-content">
       <div class="card">
         <span class="nav-label">// REAL-TIME ENGINE LOGS</span>
@@ -613,6 +728,10 @@
       pollState();
     }
 
+    async function seekTrack(val) {
+      await sendControl('seek', parseInt(val));
+    }
+
     async function updateDsp() {
       const pitch = parseFloat(document.getElementById('pitchSlider').value);
       const speed = parseFloat(document.getElementById('speedSlider').value);
@@ -630,6 +749,22 @@
       });
       const data = await res.json();
       showNotification("DSP UPDATED", data.message, "success");
+    }
+
+    async function updateDjMixer() {
+      const crossfader = parseInt(document.getElementById('crossfaderSlider').value);
+      const scratch_mode = document.getElementById('scratchToggle').checked;
+
+      const res = await fetch('/api/player/dsp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          guild_id: parseInt(currentGuildId) || 0,
+          crossfader, scratch_mode
+        })
+      });
+      const data = await res.json();
+      showNotification("DJ MIXER SYNC", data.message, "success");
     }
 
     async function adjustVolume(val) {
@@ -651,13 +786,32 @@
     async function saveSettings() {
       const prefix = document.getElementById('settingPrefix').value;
       const autoDisc = document.getElementById('settingAutoDisc').checked;
+      const announce = document.getElementById('settingAnnounce').checked;
+      const djOnly = document.getElementById('settingDjOnly').checked;
+      const stay247 = document.getElementById('setting247').checked;
+      const maxQueue = parseInt(document.getElementById('settingMaxQueue').value) || 100;
+
       const res = await fetch('/api/guild/settings', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, prefix: prefix, auto_disconnect: autoDisc })
+        body: JSON.stringify({
+          guild_id: parseInt(currentGuildId) || 0,
+          prefix,
+          auto_disconnect: autoDisc,
+          announce_songs: announce,
+          dj_only_mode: djOnly,
+          "24_7_mode": stay247,
+          max_queue_size: maxQueue
+        })
       });
       const data = await res.json();
       showNotification("SETTINGS SAVED", data.message, "success");
+    }
+
+    function formatTime(secs) {
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
     async function pollState() {
@@ -671,6 +825,18 @@
           document.getElementById('displayTitle').innerText = st.current.title.toUpperCase();
           document.getElementById('displayArtist').innerText = st.current.artist;
           document.getElementById('coverArt').src = st.current.thumbnail;
+          document.getElementById('deckAName').innerText = st.current.title;
+
+          const pos = st.position_sec || 0;
+          const dur = st.current.duration_sec || 225;
+          const pct = (pos / dur) * 100;
+
+          document.getElementById('progressFill').style.width = pct + '%';
+          const slider = document.getElementById('progressSlider');
+          slider.max = dur;
+          slider.value = pos;
+          document.getElementById('currentTimeText').innerText = formatTime(pos);
+          document.getElementById('durationText').innerText = formatTime(dur);
         }
 
         const queueList = document.getElementById('queueList');
@@ -692,7 +858,7 @@
     }
 
     initGuilds();
-    setInterval(pollState, 2500);
+    setInterval(pollState, 2000);
   </script>
 </body>
 </html>
