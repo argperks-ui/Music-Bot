@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
@@ -68,7 +68,7 @@ def get_or_create_settings(guild_id: int) -> Dict[str, Any]:
             "dj_only_mode": False,
             "max_queue_size": 100,
             "default_volume": 80,
-            "24_7_mode": False,
+            "mode_24_7": False,
             "target_vc": None
         }
     return guild_settings[guild_id]
@@ -96,8 +96,11 @@ class SettingsRequest(BaseModel):
     dj_only_mode: Optional[bool] = False
     max_queue_size: Optional[int] = 100
     default_volume: Optional[int] = 80
-    24_7_mode: Optional[bool] = False
+    mode_24_7: Optional[bool] = Field(default=False, alias="24_7_mode")
     target_vc: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
 
 class DspRequest(BaseModel):
     guild_id: int
@@ -277,14 +280,12 @@ async def api_control_player(req: ControlRequest):
         st["active_vc_id"] = str(req.value)
         msg = f"Bot connected to voice channel ID: {req.value}"
         
-        # Connect actual bot instance to Discord Voice Channel
         if bot:
             guild = bot.get_guild(req.guild_id)
             if guild:
                 channel = guild.get_channel(int(req.value))
                 if channel and isinstance(channel, discord.VoiceChannel):
                     try:
-                        # Check if already connected, move if necessary
                         if guild.voice_client:
                             await guild.voice_client.move_to(channel)
                         else:
@@ -334,7 +335,7 @@ async def api_update_settings(req: SettingsRequest):
     sett["dj_only_mode"] = req.dj_only_mode
     sett["max_queue_size"] = req.max_queue_size
     sett["default_volume"] = req.default_volume
-    sett["24_7_mode"] = req["24_7_mode"] if hasattr(req, "24_7_mode") else sett["24_7_mode"]
+    sett["mode_24_7"] = req.mode_24_7
     sett["target_vc"] = req.target_vc
     return {"status": "success", "settings": sett, "message": "Guild configuration synchronized"}
 
