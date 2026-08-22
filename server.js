@@ -12,12 +12,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// ── Multi-Owner Helper ─────────────────────────────────────────────────────
+// ── Multi-Owner Helper (Fixed to handle both OWNER_IDS and OWNER_ID properly) ──
 function isOwner(userId) {
   if (!userId) return false;
-  const ownerIds = process.env.OWNER_IDS 
-    ? process.env.OWNER_IDS.split(',').map(id => id.trim()) 
-    : [process.env.OWNER_ID];
+  const rawOwners = process.env.OWNER_IDS || process.env.OWNER_ID || '';
+  const ownerIds = rawOwners.split(',').map(id => id.trim());
   return ownerIds.includes(userId);
 }
 
@@ -111,7 +110,7 @@ app.get('/login', (req, res) => {
   });
 });
 
-// Discord OAuth2 callback (Updated to /auth/callback)
+// Discord OAuth2 callback
 app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
   if (!code) return res.redirect('/login');
