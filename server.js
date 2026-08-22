@@ -73,8 +73,6 @@ app.use((req, res, next) => {
   
   const clientId = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
   res.locals.INVITE = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`;
-  
-  // Automatically check if required tokens/IDs are missing
   res.locals.configError = !process.env.DISCORD_BOT_TOKEN || !clientId;
   
   next();
@@ -84,7 +82,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// ── Discord API Helper ────────────────────────────────────────────────     const DISCORD_API = 'https://discord.com/api/v10';
+// ── Discord API Helper ─────────────────────────────────────────────────────
+const DISCORD_API = 'https://discord.com/api/v10';
 
 async function discordFetch(endpoint, tokenType = 'bot') {
   const token = tokenType === 'bot' 
@@ -106,7 +105,6 @@ async function discordFetch(endpoint, tokenType = 'bot') {
 async function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
   
-  // Verify they're an authorized owner
   if (!isOwner(req.session.user.id)) {
     return res.status(403).send('Access denied. You are not the bot owner.');
   }
@@ -115,7 +113,6 @@ async function requireAuth(req, res, next) {
 
 // ── Routes ─────────────────────────────────────────────────────────────────
 
-// Login
 app.get('/login', (req, res) => {
   if (req.session.user && isOwner(req.session.user.id)) {
     return res.redirect('/dashboard');
@@ -127,13 +124,11 @@ app.get('/login', (req, res) => {
   });
 });
 
-// Discord OAuth2 callback
 app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
   if (!code) return res.redirect('/login');
 
   try {
-    // Exchange code for token
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -152,7 +147,6 @@ app.get('/auth/callback', async (req, res) => {
       return res.redirect('/login?error=failed');
     }
 
-    // Fetch user info
     const userData = await discordFetch('/users/@me', `Bearer ${tokenData.access_token}`);
     
     req.session.user = {
@@ -181,29 +175,24 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-// Logout
 app.get('/logout', (req, res) => {
   req.session.destroy();
   res.redirect('/login');
 });
 
-// ── Dashboard ──────────────────────────────────────────────────────────────
 app.get('/', requireAuth, (req, res) => res.redirect('/dashboard'));
 
 app.get('/dashboard', requireAuth, async (req, res) => {
   try {
-    // Fetch bot user info
     const botUser = await discordFetch('/users/@me');
-    // Fetch bot guilds
     const botGuilds = await discordFetch('/users/@me/guilds');
     
     const totalGuilds = Array.isArray(botGuilds) ? botGuilds.length : 0;
     
-    // Get approximate total members
     let totalMembers = 0;
     let voiceConnections = 0;
     if (Array.isArray(botGuilds)) {
-      for (const g of botGuilds.slice(0, 50)) { // limit to 50 for speed
+      for (const g of botGuilds.slice(0, 50)) {
         const guild = await discordFetch(`/guilds/${g.id}?with_counts=true`);
         if (guild && guild.approximate_member_count) {
           totalMembers += guild.approximate_member_count;
@@ -211,16 +200,13 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       }
     }
 
-    // Get today's command count from DB
     const today = new Date().toISOString().split('T')[0];
     const row = db.prepare("SELECT COUNT(*) as count FROM stats WHERE DATE(timestamp) = ?").get(today);
     const todayCommands = row ? row.count : 0;
     
-    // Get total commands all time
     const totalRow = db.prepare("SELECT COUNT(*) as count FROM stats").get();
     const totalCommands = totalRow ? totalRow.count : 0;
     
-    // Get uptime (last restart)
     const uptimeRow = db.prepare("SELECT timestamp FROM uptime_log WHERE event = 'startup' ORDER BY id DESC LIMIT 1").get();
     let uptime = 'N/A';
     if (uptimeRow) {
@@ -231,7 +217,6 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       uptime = `${hours}h ${minutes}m`;
     }
     
-    // Bot ping (simple latency to Discord API)
     const pingStart = Date.now();
     await discordFetch('/gateway');
     const ping = Date.now() - pingStart;
@@ -254,12 +239,10 @@ app.get('/dashboard', requireAuth, async (req, res) => {
   }
 });
 
-// ── Guilds List ────────────────────────────────────────────────────────────
 app.get('/guilds', requireAuth, async (req, res) => {
   try {
     const botGuilds = await discordFetch('/users/@me/guilds') || [];
     
-    // Enrich guilds with member counts
     const enriched = [];
     for (const g of botGuilds.slice(0, 100)) {
       const guild = await discordFetch(`/guilds/${g.id}?with_counts=true`);
@@ -283,7 +266,6 @@ app.get('/guilds', requireAuth, async (req, res) => {
   }
 });
 
-// ── Guild Detail ───────────────────────────────────────────────────────────
 app.get('/guild/:id', requireAuth, async (req, res) => {
   try {
     const guild = await discordFetch(`/guilds/${req.params.id}?with_counts=true`);
@@ -291,7 +273,6 @@ app.get('/guild/:id', requireAuth, async (req, res) => {
     
     const channels = await discordFetch(`/guilds/${req.params.id}/channels`) || [];
     
-    // Get settings from DB
     const settings = db.prepare("SELECT * FROM guild_settings WHERE guild_id = ?").get(req.params.id);
     const defaultSettings = {
       guild_id: req.params.id,
@@ -306,7 +287,7 @@ app.get('/guild/:id', requireAuth, async (req, res) => {
     res.render('guild', {
       title: 'Guild Settings',
       guild,
-      channels: channels.filter(c => c.type === 0 || c.type === 2 || c.type === 5), // text, voice, announcement
+      channels: channels.filter(c => c.type === 0 || c.type === 2 || c.type === 5),
       textChannels: channels.filter(c => c.type === 0 || c.type === 5),
       voiceChannels: channels.filter(c => c.type === 2),
       settings: settings || defaultSettings,
@@ -318,7 +299,6 @@ app.get('/guild/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Update guild settings
 app.post('/api/guild/:id/settings', requireAuth, async (req, res) => {
   try {
     const { prefix, volume, dj_role, allow_nsfw, stay_24_7, default_channel } = req.body;
@@ -342,10 +322,8 @@ app.post('/api/guild/:id/settings', requireAuth, async (req, res) => {
   }
 });
 
-// ── Analytics ──────────────────────────────────────────────────────────────
 app.get('/analytics', requireAuth, async (req, res) => {
   try {
-    // Commands by day (last 7 days)
     const dailyStats = db.prepare(`
       SELECT DATE(timestamp) as date, COUNT(*) as count
       FROM stats
@@ -354,7 +332,6 @@ app.get('/analytics', requireAuth, async (req, res) => {
       ORDER BY date
     `).all();
     
-    // Most used commands
     const topCommands = db.prepare(`
       SELECT command, COUNT(*) as count
       FROM stats
@@ -363,7 +340,6 @@ app.get('/analytics', requireAuth, async (req, res) => {
       LIMIT 10
     `).all();
     
-    // Commands by hour
     const hourlyStats = db.prepare(`
       SELECT CAST(strftime('%H', timestamp) AS INTEGER) as hour, COUNT(*) as count
       FROM stats
@@ -371,7 +347,6 @@ app.get('/analytics', requireAuth, async (req, res) => {
       ORDER BY hour
     `).all();
 
-    // Total stats
     const totalRow = db.prepare("SELECT COUNT(*) as count FROM stats").get();
     const today = new Date().toISOString().split('T')[0];
     const todayRow = db.prepare("SELECT COUNT(*) as count FROM stats WHERE DATE(timestamp) = ?").get(today);
@@ -391,7 +366,6 @@ app.get('/analytics', requireAuth, async (req, res) => {
   }
 });
 
-// ── Logs ───────────────────────────────────────────────────────────────────
 app.get('/logs', requireAuth, async (req, res) => {
   try {
     const logs = db.prepare(`
@@ -409,13 +383,10 @@ app.get('/logs', requireAuth, async (req, res) => {
   }
 });
 
-// ── API: Receive stats from bot ────────────────────────────────────────────
 app.post('/api/stats/update', (req, res) => {
   const { command, guild_id, user_id } = req.body;
-  
   if (!command) return res.status(400).json({ error: 'command is required' });
   
-  // Verify the request is from the bot (check Authorization header)
   const auth = req.headers.authorization;
   if (auth !== `Bearer ${process.env.DISCORD_BOT_TOKEN}`) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -425,16 +396,13 @@ app.post('/api/stats/update', (req, res) => {
     db.prepare("INSERT INTO stats (command, guild_id, user_id) VALUES (?, ?, ?)")
       .run(command, guild_id || 'unknown', user_id || 'unknown');
     
-    // Emit to Socket.IO for real-time logs
     io.emit('new_command', { command, guild_id, user_id, timestamp: new Date().toISOString() });
-    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// API: Get bot stats (for AJAX dashboard refresh)
 app.get('/api/stats/overview', requireAuth, async (req, res) => {
   try {
     const botUser = await discordFetch('/users/@me');
@@ -447,7 +415,6 @@ app.get('/api/stats/overview', requireAuth, async (req, res) => {
     
     const totalRow = db.prepare("SELECT COUNT(*) as count FROM stats").get();
     
-    // Ping
     const pingStart = Date.now();
     await discordFetch('/gateway');
     const ping = Date.now() - pingStart;
@@ -464,29 +431,23 @@ app.get('/api/stats/overview', requireAuth, async (req, res) => {
   }
 });
 
-// API: Get recent logs
 app.get('/api/logs/recent', requireAuth, (req, res) => {
   const logs = db.prepare("SELECT * FROM stats ORDER BY timestamp DESC LIMIT 20").all();
   res.json(logs);
 });
 
-// ── Bot Status API ─────────────────────────────────────────────────────────
 app.get('/api/bot/status', requireAuth, async (req, res) => {
   try {
     const botUser = await discordFetch('/users/@me');
     const botGuilds = await discordFetch('/users/@me/guilds');
-    
-    // Get memory usage
     const memUsage = process.memoryUsage();
     
-    // Get uptime
     const uptimeRow = db.prepare("SELECT timestamp FROM uptime_log WHERE event = 'startup' ORDER BY id DESC LIMIT 1").get();
     let uptimeSeconds = 0;
     if (uptimeRow) {
       uptimeSeconds = Math.floor((Date.now() - new Date(uptimeRow.timestamp + 'Z').getTime()) / 1000);
     }
 
-    // Ping
     const pingStart = Date.now();
     await discordFetch('/gateway');
     const ping = Date.now() - pingStart;
@@ -511,11 +472,8 @@ app.get('/api/bot/status', requireAuth, async (req, res) => {
   }
 });
 
-// ── Socket.IO ──────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log('Client connected to socket');
-  
-  // Send latest logs on connect
   const logs = db.prepare("SELECT * FROM stats ORDER BY timestamp DESC LIMIT 10").all();
   socket.emit('initial_logs', logs);
   
@@ -524,8 +482,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── Startup ────────────────────────────────────────────────────────────────
-// Log startup
 db.prepare("INSERT INTO uptime_log (event) VALUES ('startup')").run();
 
 const PORT = process.env.PORT || 3000;
