@@ -8,14 +8,15 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
-# --- 1. FASTAPI DASHBOARD & OAUTH2 SERVER ---
-app = FastAPI()
+# --- FASTAPI DASHBOARD & OAUTH2 SERVER ---
+app = FastAPI(title="Git Music API")
 
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 CALLBACK_URL = os.getenv("CALLBACK_URL")
 DISCORD_API = "https://discord.com/api/v10"
 
+# --- OAUTH2 AUTHENTICATION ---
 @app.get("/api/auth/login")
 async def discord_login():
     oauth_url = (
@@ -56,7 +57,54 @@ async def discord_callback(code: str):
     )
     return response
 
-# Serve Next.js static export from viper-audio-core/out
+# --- WEBDASHBOARD CONTROL API ENDPOINTS ---
+@app.get("/api/player/{guild_id}")
+async def get_player_state(guild_id: int):
+    cog = bot.get_cog("MusicCommands")
+    if not cog:
+        raise HTTPException(status_code=500, detail="Music engine not loaded.")
+    
+    current = cog.now_playing.get(guild_id)
+    queue = cog.queues.get(guild_id, [])
+    volume = int(cog.guild_volume.get(guild_id, 0.5) * 100)
+    loop = cog.loop_modes.get(guild_id, "off")
+
+    return {
+        "guild_id": guild_id,
+        "now_playing": current,
+        "queue": queue,
+        "volume": volume,
+        "loop": loop
+    }
+
+@app.post("/api/player/{guild_id}/control")
+async def player_control(guild_id: int, request: Request):
+    data = await request.json()
+    action = data.get("action")
+    val = data.get("value")
+
+    guild = bot.get_guild(guild_id)
+    if not guild or not guild.voice_client:
+        raise HTTPException(status_code=400, detail="Bot not connected to voice in this server.")
+
+    vc = guild.voice_client
+    cog = bot.get_cog("MusicCommands")
+
+    if action == "pause" and vc.is_playing():
+        vc.pause()
+    elif action == "resume" and vc.is_paused():
+        vc.resume()
+    elif action == "skip" and (vc.is_playing() or vc.is_paused()):
+        vc.stop()
+    elif action == "volume" and val is not None:
+        level = max(0.0, min(1.0, float(val) / 100.0))
+        cog.guild_volume[guild_id] = level
+        if vc.source:
+            vc.source.volume = level
+
+    return {"status": "success", "action": action}
+
+# --- STATIC FILE SERVING FOR NEXT.JS FRONTEND ---
 if os.path.exists("viper-audio-core/out"):
     app.mount("/_next", StaticFiles(directory="viper-audio-core/out/_next"), name="next")
 
@@ -67,22 +115,22 @@ if os.path.exists("viper-audio-core/out"):
             return FileResponse(file_path)
         return FileResponse("viper-audio-core/out/index.html")
 
-# --- 2. DISCORD BOT BOT INITIALIZATION ---
-class CyberMusicBot(commands.Bot):
+# --- DISCORD BOT INITIALIZATION ---
+class GitMusicBot(commands.Bot):
     async def setup_hook(self):
         await self.load_extension("commands")
-        print("⚙️ Loaded commands extension.")
+        print("⚙️ Loaded commands extension for Git Music.")
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = CyberMusicBot(command_prefix="!", intents=intents)
+bot = GitMusicBot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f"✅ Logged in as {bot.user} | Commands synced.")
+    print(f"✅ Logged in as {bot.user} (Git Music) | Commands synced.")
 
-# --- 3. DUAL-PROCESS RUNNER ---
+# --- DUAL-PROCESS RUNNER ---
 async def start_web_server():
     port = int(os.environ.get("PORT", 3000))
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")

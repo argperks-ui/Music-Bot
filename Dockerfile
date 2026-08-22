@@ -1,14 +1,14 @@
 # --- Stage 1: Build Next.js Dashboard ---
 FROM node:20-alpine AS frontend-builder
-WORKDIR /app/viper-audio-core
+WORKDIR /app/Git-Music-Dashboard
 
 # Copy package definitions and install dependencies
-COPY viper-audio-core/package*.json ./
-COPY viper-audio-core/pnpm-lock.yaml* ./
+COPY Git-Music-Dashboard/package*.json ./
+COPY Git-Music-Dashboard/pnpm-lock.yaml* ./
 RUN npm install
 
 # Copy frontend source code and compile static build (/out)
-COPY viper-audio-core/ ./
+COPY Git-Music-Dashboard/ ./
 RUN npm run build
 
 # --- Stage 2: Python Runtime with Audio Support ---
@@ -29,7 +29,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy compiled Next.js static files from Stage 1
-COPY --from=frontend-builder /app/viper-audio-core/out ./viper-audio-core/out
+COPY --from=frontend-builder /app/Git-Music-Dashboard/out ./Git-Music-Dashboard/out
 
 # Copy Discord bot source code
 COPY bot.py commands.py embeds.py ./
