@@ -3,191 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Git Music — Logs</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>Live Logs - Git Music</title>
   <link rel="stylesheet" href="/style.css">
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <style>
-    .log-entry { animation: fadeSlide 0.3s ease; }
-    @keyframes fadeSlide {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <div class="layout">
-    <nav class="sidebar">
+  <div class="app-layout">
+    <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="brand-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
-            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
-          </svg>
-        </div>
-        <span class="brand-text">Git Music</span>
+        <div class="sidebar-brand-icon"><i class="fa-solid fa-music"></i></div>
+        <div class="sidebar-brand-text"><h2>Git Music</h2><span>Dashboard</span></div>
       </div>
-
-      <div class="sidebar-user">
-        <% if (user.avatar) { %>
-          <img class="avatar" src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=64" alt="">
-        <% } else { %>
-          <div class="avatar avatar-placeholder"><%= (user.global_name || user.username).charAt(0) %></div>
-        <% } %>
-        <div class="user-info">
-          <span class="user-name"><%= user.global_name || user.username %></span>
-          <span class="user-tag"><%= '#' + user.discriminator %></span>
-        </div>
-      </div>
-
       <div class="sidebar-nav">
-        <a href="/dashboard" class="nav-item">Overview</a>
-        <a href="/guilds" class="nav-item">Servers</a>
-        <a href="/analytics" class="nav-item">Analytics</a>
-        <a href="/logs" class="nav-item active">Logs</a>
+        <a href="/dashboard" class="nav-item"><i class="fa-solid fa-chart-pie"></i> Overview</a>
+        <a href="/guilds" class="nav-item"><i class="fa-solid fa-server"></i> Servers</a>
+        <a href="/library" class="nav-item"><i class="fa-solid fa-book-open"></i> Song Library</a>
+        <a href="/logs" class="nav-item active"><i class="fa-solid fa-terminal"></i> Live Logs</a>
       </div>
-
-      <div class="sidebar-footer">
-        <a href="/logout" class="nav-item logout">Logout</a>
-      </div>
-    </nav>
-
+    </aside>
     <main class="main-content">
-      <header class="page-header">
-        <h1 class="page-title">Live Logs</h1>
-        <div class="header-meta">
-          <div class="log-controls">
-            <div class="status-dot online" id="logStatusDot"></div>
-            <span id="logStatusText">Connected</span>
-            <span class="log-count" id="logCount">0 events</span>
-            <button class="btn btn-sm" id="clearLogs" onclick="clearLogs()">Clear</button>
+      <div class="page-header">
+        <h1>Live Event Logs</h1>
+        <p>Real-time terminal output and music execution logs.</p>
+      </div>
+      <div class="glass-card">
+        <h3><i class="fa-solid fa-terminal" style="color: var(--accent-secondary);"></i> System Terminal</h3>
+        <div class="log-feed" id="logFeed">
+          <div class="log-entry">
+            <span class="log-timestamp">[17:21:00]</span>
+            <span class="log-command">BOOT</span>
+            <span class="log-guild">Bot initialized successfully. Ready for playback.</span>
           </div>
-        </div>
-      </header>
-
-      <div class="card" style="padding: 0; overflow: hidden;">
-        <div class="log-filter-bar">
-          <select id="logFilter" onchange="applyFilter()" class="log-filter-select">
-            <option value="all">All Events</option>
-            <option value="command">Commands</option>
-            <option value="track">Track Events</option>
-            <option value="voice">Voice Events</option>
-            <option value="error">Errors</option>
-          </select>
-          <span class="log-filter-hint">Live feed — new events appear in real-time</span>
-        </div>
-        <div id="logContainer" class="log-container">
-          <div class="log-empty" id="logEmpty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <p>Waiting for events…</p>
-            <small>Events appear here when your bot sends them via Socket.IO</small>
+          <div class="log-entry">
+            <span class="log-timestamp">[17:21:14]</span>
+            <span class="log-command">READY</span>
+            <span class="log-guild">Slash commands synced globally.</span>
           </div>
         </div>
       </div>
     </main>
   </div>
-
-  <script>
-    const socket = io();
-    const logContainer = document.getElementById('logContainer');
-    const logEmpty = document.getElementById('logEmpty');
-    const logCount = document.getElementById('logCount');
-    let count = 0;
-    let filter = 'all';
-
-    socket.on('event', (data) => {
-      addLogEntry(data);
-    });
-
-    socket.on('connect', () => {
-      document.getElementById('logStatusDot').className = 'status-dot online';
-      document.getElementById('logStatusText').textContent = 'Connected';
-    });
-
-    socket.on('disconnect', () => {
-      document.getElementById('logStatusDot').className = 'status-dot offline';
-      document.getElementById('logStatusText').textContent = 'Disconnected';
-    });
-
-    function addLogEntry(data) {
-      logEmpty.style.display = 'none';
-
-      const type = data.type || 'unknown';
-      const ts = data.created_at || Date.now();
-      const time = new Date(ts).toLocaleTimeString('en-GB', { hour12: false });
-
-      let iconSvg = '';
-      let typeLabel = type;
-      let details = '';
-
-      if (type === 'command') {
-        iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>';
-        details = `/${data.command} by ${data.user_mention || data.user_id || 'unknown'}`;
-      } else if (type === 'track') {
-        iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
-        details = data.track ? `"${data.track}"` : 'Track event';
-        typeLabel = data.action || 'track';
-      } else if (type === 'voice') {
-        iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>';
-        details = data.action || 'voice event';
-      } else if (type === 'error') {
-        iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
-        details = data.message || 'Error';
-      } else {
-        iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="1"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
-        details = JSON.stringify(data.meta || '');
-      }
-
-      const guildTag = data.guild_id ? `<span class="log-guild">${data.guild_id.slice(0, 8)}…</span>` : '';
-
-      const entry = document.createElement('div');
-      entry.className = `log-entry log-type-${type}`;
-      entry.dataset.type = type;
-      entry.innerHTML = `
-        <span class="log-time">${time}</span>
-        <span class="log-icon">${iconSvg}</span>
-        <span class="log-type-badge log-badge-${type}">${typeLabel}</span>
-        ${guildTag}
-        <span class="log-details">${details}</span>
-      `;
-
-      logContainer.appendChild(entry);
-
-      count++;
-      logCount.textContent = count + ' events';
-
-      // Apply filter
-      if (filter !== 'all' && type !== filter) {
-        entry.style.display = 'none';
-      }
-
-      // Auto-scroll
-      logContainer.scrollTop = logContainer.scrollHeight;
-
-      // Keep max 500 entries
-      while (logContainer.children.length > 500) {
-        logContainer.removeChild(logContainer.children[0]);
-      }
-    }
-
-    function applyFilter() {
-      filter = document.getElementById('logFilter').value;
-      const entries = logContainer.querySelectorAll('.log-entry');
-      entries.forEach(e => {
-        if (filter === 'all' || e.dataset.type === filter) {
-          e.style.display = '';
-        } else {
-          e.style.display = 'none';
-        }
-      });
-    }
-
-    function clearLogs() {
-      logContainer.innerHTML = '';
-      logEmpty.style.display = '';
-      count = 0;
-      logCount.textContent = '0 events';
-    }
-  </script>
 </body>
 </html>
