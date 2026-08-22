@@ -64,7 +64,7 @@ app.use(session({
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// 🌟 Global View Variables Middleware (Prevents missing variable errors permanently)
+// 🌟 Global View Variables Middleware (Prevents all missing variable errors permanently)
 app.use((req, res, next) => {
   res.locals.title = 'Git Music Dashboard';
   res.locals.active = '';
@@ -74,6 +74,9 @@ app.use((req, res, next) => {
   const clientId = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
   res.locals.INVITE = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`;
   
+  // Automatically check if required tokens/IDs are missing
+  res.locals.configError = !process.env.DISCORD_BOT_TOKEN || !clientId;
+  
   next();
 });
 
@@ -81,8 +84,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// ── Discord API Helper ─────────────────────────────────────────────────────
-const DISCORD_API = 'https://discord.com/api/v10';
+// ── Discord API Helper ────────────────────────────────────────────────     const DISCORD_API = 'https://discord.com/api/v10';
 
 async function discordFetch(endpoint, tokenType = 'bot') {
   const token = tokenType === 'bot' 
