@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eclipse Viper Studio Platform</title>
+  <title>Git Music Studio Platform</title>
   <link rel="icon" type="image/png" href="/tab-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +12,7 @@
   <style>
     :root {
       --bg-dark: #05070a;
-      --card-bg: rgba(13, 18, 30, 0.8);
+      --card-bg: rgba(13, 18, 30, 0.88);
       --card-border: rgba(255, 255, 255, 0.08);
       --accent-cyan: #00f2fe;
       --accent-purple: #7928ca;
@@ -20,6 +20,7 @@
       --text-main: #f1f5f9;
       --text-muted: #64748b;
       --danger: #ff4757;
+      --success: #10b981;
       --mono: 'JetBrains Mono', monospace;
     }
 
@@ -28,15 +29,92 @@
     body {
       background: var(--bg-dark);
       background-image: 
-        radial-gradient(at 0% 0%, rgba(121, 40, 202, 0.12) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(0, 242, 254, 0.10) 0px, transparent 50%);
+        radial-gradient(at 0% 0%, rgba(121, 40, 202, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(0, 242, 254, 0.12) 0px, transparent 50%);
       color: var(--text-main);
       display: flex;
       height: 100vh;
       overflow: hidden;
     }
 
-    /* Sidebar */
+    #toastContainer {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      pointer-events: auto;
+      min-width: 300px;
+      background: rgba(13, 18, 30, 0.95);
+      backdrop-filter: blur(16px);
+      border-left: 4px solid var(--accent-cyan);
+      border: 1px solid var(--card-border);
+      border-left-width: 4px;
+      padding: 14px 18px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transform: translateX(120%);
+      transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .toast.show { transform: translateX(0); }
+    .toast.toast-success { border-left-color: var(--success); }
+    .toast.toast-danger { border-left-color: var(--danger); }
+    .toast-body { display: flex; flex-direction: column; gap: 2px; }
+    .toast-title { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); font-family: var(--mono); }
+    .toast-desc { font-size: 0.88rem; font-weight: 600; color: #fff; }
+
+    .custom-select-wrapper { position: relative; width: 100%; }
+    .custom-select-trigger {
+      background: #080a10;
+      border: 1px solid var(--card-border);
+      padding: 12px 14px;
+      border-radius: 10px;
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .custom-select-trigger:hover { border-color: rgba(0, 242, 254, 0.4); }
+    .custom-select-options {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: #080b12;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.8);
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .custom-select-wrapper.open .custom-select-options { display: flex; }
+    .custom-option {
+      padding: 10px 14px;
+      color: #94a3b8;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .custom-option:hover { background: rgba(0, 242, 254, 0.15); color: var(--accent-cyan); }
+    .custom-option.selected { color: #fff; background: rgba(88, 101, 242, 0.2); }
+
     .sidebar {
       width: 290px;
       background: rgba(8, 11, 18, 0.95);
@@ -86,7 +164,6 @@
 
     .nav-symbol { font-family: var(--mono); color: var(--accent-cyan); font-weight: 700; }
 
-    /* Target Guild Picker */
     .guild-card {
       margin-top: auto;
       background: var(--card-bg);
@@ -98,18 +175,6 @@
       gap: 8px;
     }
 
-    .guild-select {
-      width: 100%;
-      background: #080a10;
-      border: 1px solid var(--card-border);
-      color: #fff;
-      padding: 8px 10px;
-      border-radius: 8px;
-      font-weight: 600;
-      outline: none;
-    }
-
-    /* Workspace Body */
     .workspace {
       flex: 1;
       display: flex;
@@ -119,11 +184,9 @@
       gap: 20px;
     }
 
-    /* Tab Sections */
     .tab-content { display: none; flex-direction: column; gap: 20px; }
     .tab-content.active { display: flex; }
 
-    /* Input & Buttons */
     .search-bar-wrapper { display: flex; gap: 12px; }
     .search-input {
       flex: 1;
@@ -134,6 +197,7 @@
       color: #fff;
       outline: none;
     }
+    .search-input:focus { border-color: var(--accent-cyan); }
 
     .btn {
       background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
@@ -144,11 +208,13 @@
       font-weight: 700;
       font-size: 0.88rem;
       cursor: pointer;
+      transition: opacity 0.2s;
     }
+    .btn:hover { opacity: 0.9; }
 
     .btn-secondary { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
 
-    /* Layout Grids */
     .dashboard-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
     .card {
       background: var(--card-bg);
@@ -160,7 +226,6 @@
       gap: 18px;
     }
 
-    /* Deck Visualizer */
     .now-playing-stage {
       display: flex;
       flex-direction: column;
@@ -176,7 +241,6 @@
     .track-name { font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 4px; }
     .track-artist { font-size: 0.85rem; color: var(--accent-cyan); font-weight: 600; }
 
-    /* Control Buttons */
     .deck-controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
     .control-btn {
       width: 44px;
@@ -191,9 +255,7 @@
       justify-content: center;
       cursor: pointer;
     }
-    .control-btn.active-toggle { border-color: var(--accent-cyan); background: rgba(0, 242, 254, 0.2); }
 
-    /* Dynamic Queue */
     .queue-list { display: flex; flex-direction: column; gap: 8px; list-style: none; max-height: 400px; overflow-y: auto; }
     .queue-card {
       display: flex;
@@ -205,11 +267,9 @@
       border-radius: 10px;
     }
 
-    /* Settings UI */
     .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--card-border); }
-    .setting-input { background: #080a10; border: 1px solid var(--card-border); color: #fff; padding: 6px 12px; border-radius: 6px; }
+    .setting-input { background: #080a10; border: 1px solid var(--card-border); color: #fff; padding: 8px 12px; border-radius: 6px; outline: none; }
 
-    /* Logs Matrix */
     .log-terminal {
       background: #040508;
       border: 1px solid var(--card-border);
@@ -224,29 +284,37 @@
       flex-direction: column;
       gap: 6px;
     }
+
+    input[type=range] { accent-color: var(--accent-cyan); }
   </style>
 </head>
 <body>
 
+  <div id="toastContainer"></div>
+
   <aside class="sidebar">
     <div class="brand">
       <img src="/tab-icon.png" alt="Logo" onerror="this.style.display='none'">
-      <span>ECLIPSE VIPER</span>
+      <span>GIT MUSIC</span>
     </div>
 
     <div class="nav-group">
       <span class="nav-label">// ENGINE CONTROLS</span>
       <div class="nav-item active" onclick="switchTab('studioTab', this)"><span class="nav-symbol">[#]</span> Studio Console</div>
-      <div class="nav-item" onclick="switchTab('dspTab', this)"><span class="nav-symbol">[*]</span> Audio DSP & EQ</div>
+      <div class="nav-item" onclick="switchTab('dspTab', this)"><span class="nav-symbol">[*]</span> DSP & Equalizer</div>
       <div class="nav-item" onclick="switchTab('settingsTab', this)"><span class="nav-symbol">[%]</span> Server Rules</div>
       <div class="nav-item" onclick="switchTab('logsTab', this)"><span class="nav-symbol">[!]</span> System Terminal</div>
     </div>
 
     <div class="guild-card">
       <span class="nav-label">// TARGET GUILD</span>
-      <select id="guildSelect" class="guild-select" onchange="switchGuild()">
-        <option value="123456789012345678">Eclipse Main Guild</option>
-      </select>
+      <div class="custom-select-wrapper" id="guildDropdown">
+        <div class="custom-select-trigger" onclick="toggleDropdown('guildDropdown')">
+          <span id="selectedGuildText">Git Music Main Guild</span>
+          <span style="font-size:0.7rem; color:var(--accent-cyan);">▼</span>
+        </div>
+        <div class="custom-select-options" id="guildDropdownOptions"></div>
+      </div>
     </div>
   </aside>
 
@@ -255,8 +323,8 @@
     <!-- TAB 1: STUDIO CONSOLE -->
     <div id="studioTab" class="tab-content active">
       <div class="search-bar-wrapper">
-        <input type="text" id="searchInput" class="search-input" placeholder="Search track or enter URL..." onkeydown="if(event.key==='Enter') triggerSearch()">
-        <button class="btn" onclick="triggerSearch()">Execute Search</button>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search track title, query or stream URL..." onkeydown="if(event.key==='Enter') triggerSearch()">
+        <button class="btn" onclick="triggerSearch()">Search Audio</button>
       </div>
 
       <div id="searchPanel" style="display:none; flex-direction:column; gap:8px;" class="card">
@@ -269,25 +337,38 @@
           <span class="nav-label">// ACTIVE DECK</span>
           <div class="now-playing-stage">
             <img id="coverArt" src="https://picsum.photos/seed/default/300/300" class="now-playing-cover" alt="Cover">
-            <div id="displayTitle" class="track-name">NO ACTIVE STREAM</div>
-            <div id="displayArtist" class="track-artist">System Standby</div>
+            <div id="displayTitle" class="track-name">GIT MUSIC STUDIO STREAM</div>
+            <div id="displayArtist" class="track-artist">Verified Audio Core</div>
           </div>
+          
           <div class="deck-controls">
             <button class="control-btn" title="Pause" onclick="sendControl('pause')">&#10074;&#10074;</button>
             <button class="control-btn" style="background:var(--accent-cyan); color:#000;" title="Play" onclick="sendControl('resume')">&#9654;</button>
             <button class="control-btn" title="Skip" onclick="sendControl('skip')">&#9197;</button>
           </div>
+
           <div style="display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:0.8rem;">
             <span>VOL</span>
             <input type="range" id="volumeSlider" min="0" max="100" value="80" style="flex:1;" onchange="adjustVolume(this.value)">
             <span id="volumeVal">80%</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:6px; margin-top:10px;">
+            <span class="nav-label">// BIND VOICE CHANNEL</span>
+            <div class="custom-select-wrapper" id="vcDropdown">
+              <div class="custom-select-trigger" onclick="toggleDropdown('vcDropdown')">
+                <span id="selectedVcText">Select Channel...</span>
+                <span style="font-size:0.7rem; color:var(--accent-cyan);">▼</span>
+              </div>
+              <div class="custom-select-options" id="vcDropdownOptions"></div>
+            </div>
           </div>
         </div>
 
         <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <span class="nav-label">// QUEUE STACK</span>
-            <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem;" onclick="sendControl('clear')">[CLEAR]</button>
+            <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem;" onclick="sendControl('clear')">[CLEAR STACK]</button>
           </div>
           <ul class="queue-list" id="queueList">
             <li style="color:var(--text-muted); font-family:var(--mono); text-align:center;">Stack Empty</li>
@@ -296,23 +377,65 @@
       </div>
     </div>
 
-    <!-- TAB 2: AUDIO DSP & EQ -->
+    <!-- TAB 2: DSP & EQUALIZER -->
     <div id="dspTab" class="tab-content">
       <div class="card">
-        <span class="nav-label">// DIGITAL SIGNAL PROCESSING</span>
+        <span class="nav-label">// HARDWARE AUDIO PITCH & TEMPO PROCESSING</span>
+        
         <div class="setting-row">
           <div>
-            <div style="font-weight:700;">Bass Boost Hardware Filter</div>
-            <div style="font-size:0.8rem; color:var(--text-muted);">Amplify lower band audio frequencies by +8dB</div>
+            <div style="font-weight:700;">Pitch Shift Multiplier</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Adjust frequency key modulation without changing speed</div>
           </div>
-          <button id="btnBass" class="btn btn-secondary" onclick="sendControl('toggle_bass')">DISABLED</button>
+          <div style="display:flex; align-items:center; gap:12px; font-family:var(--mono);">
+            <input type="range" id="pitchSlider" min="0.5" max="2.0" step="0.05" value="1.0" oninput="document.getElementById('pitchVal').innerText = parseFloat(this.value).toFixed(2) + 'x'" onchange="updateDsp()">
+            <span id="pitchVal" style="min-width:45px; color:var(--accent-cyan);">1.00x</span>
+          </div>
         </div>
+
         <div class="setting-row">
           <div>
-            <div style="font-weight:700;">Nightcore Resampler</div>
-            <div style="font-size:0.8rem; color:var(--text-muted);">Increase pitch and playback rate by 1.25x</div>
+            <div style="font-weight:700;">Speed Tempo Rate</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Control stream resampling rate</div>
           </div>
-          <button id="btnNightcore" class="btn btn-secondary" onclick="sendControl('toggle_nightcore')">DISABLED</button>
+          <div style="display:flex; align-items:center; gap:12px; font-family:var(--mono);">
+            <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.05" value="1.0" oninput="document.getElementById('speedVal').innerText = parseFloat(this.value).toFixed(2) + 'x'" onchange="updateDsp()">
+            <span id="speedVal" style="min-width:45px; color:var(--accent-cyan);">1.00x</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="nav-label">// 3-BAND FREQUENCY EQUALIZER</span>
+        
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Bass Gain (60Hz)</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; font-family:var(--mono);">
+            <input type="range" id="bassSlider" min="-12" max="12" step="1" value="0" oninput="document.getElementById('bassVal').innerText = (this.value > 0 ? '+' : '') + this.value + 'dB'" onchange="updateDsp()">
+            <span id="bassVal" style="min-width:45px; color:var(--accent-cyan);">0dB</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Mid Gain (1kHz)</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; font-family:var(--mono);">
+            <input type="range" id="midSlider" min="-12" max="12" step="1" value="0" oninput="document.getElementById('midVal').innerText = (this.value > 0 ? '+' : '') + this.value + 'dB'" onchange="updateDsp()">
+            <span id="midVal" style="min-width:45px; color:var(--accent-cyan);">0dB</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div style="font-weight:700;">Treble Gain (14kHz)</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; font-family:var(--mono);">
+            <input type="range" id="trebleSlider" min="-12" max="12" step="1" value="0" oninput="document.getElementById('trebleVal').innerText = (this.value > 0 ? '+' : '') + this.value + 'dB'" onchange="updateDsp()">
+            <span id="trebleVal" style="min-width:45px; color:var(--accent-cyan);">0dB</span>
+          </div>
         </div>
       </div>
     </div>
@@ -344,7 +467,7 @@
       <div class="card">
         <span class="nav-label">// REAL-TIME ENGINE LOGS</span>
         <div id="logTerminal" class="log-terminal">
-          <div>[SYS] Engine online.</div>
+          <div>[SYS] Git Music Core online.</div>
         </div>
       </div>
     </div>
@@ -353,6 +476,37 @@
 
   <script>
     let currentGuildId = "123456789012345678";
+
+    function showNotification(title, message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.innerHTML = `
+        <div class="toast-body">
+          <div class="toast-title">${title}</div>
+          <div class="toast-desc">${message}</div>
+        </div>
+      `;
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('show'));
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 400);
+      }, 3500);
+    }
+
+    function toggleDropdown(id) {
+      const el = document.getElementById(id);
+      const isOpened = el.classList.contains('open');
+      document.querySelectorAll('.custom-select-wrapper').forEach(w => w.classList.remove('open'));
+      if (!isOpened) el.classList.add('open');
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.custom-select-wrapper')) {
+        document.querySelectorAll('.custom-select-wrapper').forEach(w => w.classList.remove('open'));
+      }
+    });
 
     function switchTab(tabId, el) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -365,18 +519,50 @@
       try {
         const res = await fetch('/api/bot/guilds');
         const data = await res.json();
-        const select = document.getElementById('guildSelect');
+        const optionsContainer = document.getElementById('guildDropdownOptions');
         if (data.guilds && data.guilds.length > 0) {
-          select.innerHTML = data.guilds.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-          currentGuildId = data.guilds[0].id;
+          optionsContainer.innerHTML = data.guilds.map(g => `
+            <div class="custom-option" onclick="selectGuild('${g.id}', '${g.name}')">${g.name}</div>
+          `).join('');
+          selectGuild(data.guilds[0].id, data.guilds[0].name, false);
         }
       } catch (e) {}
-      pollState();
     }
 
-    function switchGuild() {
-      currentGuildId = document.getElementById('guildSelect').value;
-      pollState();
+    function selectGuild(id, name, fetchState = true) {
+      currentGuildId = id;
+      document.getElementById('selectedGuildText').innerText = name;
+      document.querySelectorAll('#guildDropdownOptions .custom-option').forEach(o => {
+        o.classList.toggle('selected', o.innerText === name);
+      });
+      document.getElementById('guildDropdown').classList.remove('open');
+      loadVoiceChannels();
+      if (fetchState) pollState();
+    }
+
+    async function loadVoiceChannels() {
+      try {
+        const res = await fetch(`/api/bot/voice_channels/${currentGuildId}`);
+        const data = await res.json();
+        const optionsContainer = document.getElementById('vcDropdownOptions');
+        if (data.channels && data.channels.length > 0) {
+          optionsContainer.innerHTML = data.channels.map(vc => `
+            <div class="custom-option" onclick="selectVoiceChannel('${vc.id}', '${vc.name}')">${vc.name} (${vc.members_count} active)</div>
+          `).join('');
+        }
+      } catch(e) {}
+    }
+
+    async function selectVoiceChannel(id, name) {
+      document.getElementById('selectedVcText').innerText = name;
+      document.getElementById('vcDropdown').classList.remove('open');
+      const res = await fetch('/api/player/control', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, action: 'join_vc', value: id })
+      });
+      const data = await res.json();
+      showNotification("VOICE BOUND", data.message, "success");
     }
 
     async function triggerSearch() {
@@ -389,7 +575,7 @@
       if (data.results) {
         panel.style.display = 'flex';
         container.innerHTML = data.results.map(item => `
-          <div style="display:flex; justify-space-between; align-items:center; padding:8px; background:rgba(255,255,255,0.02); border-radius:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:rgba(255,255,255,0.02); border-radius:8px;">
             <div style="display:flex; align-items:center; gap:10px;">
               <img src="${item.thumbnail}" style="width:36px; height:36px; border-radius:6px;">
               <div>
@@ -397,30 +583,53 @@
                 <div style="font-size:0.75rem; color:var(--text-muted);">${item.artist}</div>
               </div>
             </div>
-            <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick="addTrack('${item.query}')">+ Play</button>
+            <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick="addTrack('${item.query}')">+ Enqueue</button>
           </div>
         `).join('');
       }
     }
 
     async function addTrack(q) {
-      await fetch('/api/player/play', {
+      const res = await fetch('/api/player/play', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, query: q })
       });
+      const data = await res.json();
       document.getElementById('searchPanel').style.display = 'none';
       document.getElementById('searchInput').value = '';
+      showNotification("QUEUE UPDATED", data.message, "success");
       pollState();
     }
 
     async function sendControl(action, val = null) {
-      await fetch('/api/player/control', {
+      const res = await fetch('/api/player/control', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, action: action, value: val })
       });
+      const data = await res.json();
+      showNotification("CONTROL EXEC", data.message, "info");
       pollState();
+    }
+
+    async function updateDsp() {
+      const pitch = parseFloat(document.getElementById('pitchSlider').value);
+      const speed = parseFloat(document.getElementById('speedSlider').value);
+      const bass = parseInt(document.getElementById('bassSlider').value);
+      const mid = parseInt(document.getElementById('midSlider').value);
+      const treble = parseInt(document.getElementById('trebleSlider').value);
+
+      const res = await fetch('/api/player/dsp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          guild_id: parseInt(currentGuildId) || 0,
+          pitch, speed, bass, mid, treble
+        })
+      });
+      const data = await res.json();
+      showNotification("DSP UPDATED", data.message, "success");
     }
 
     async function adjustVolume(val) {
@@ -429,55 +638,57 @@
     }
 
     async function removeQueueIndex(idx) {
-      await fetch('/api/player/remove', {
+      const res = await fetch('/api/player/remove', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, index: idx })
       });
+      const data = await res.json();
+      showNotification("QUEUE ITEM REMOVED", data.message, "danger");
       pollState();
     }
 
     async function saveSettings() {
       const prefix = document.getElementById('settingPrefix').value;
       const autoDisc = document.getElementById('settingAutoDisc').checked;
-      await fetch('/api/guild/settings', {
+      const res = await fetch('/api/guild/settings', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ guild_id: parseInt(currentGuildId) || 0, prefix: prefix, auto_disconnect: autoDisc })
       });
-      alert('Settings Saved');
+      const data = await res.json();
+      showNotification("SETTINGS SAVED", data.message, "success");
     }
 
     async function pollState() {
-      const res = await fetch(`/api/player/state/${parseInt(currentGuildId) || 0}`);
-      const data = await res.json();
-      const st = data.state;
-      if (!st) return;
+      try {
+        const res = await fetch(`/api/player/state/${parseInt(currentGuildId) || 0}`);
+        const data = await res.json();
+        const st = data.state;
+        if (!st) return;
 
-      if (st.current) {
-        document.getElementById('displayTitle').innerText = st.current.title.toUpperCase();
-        document.getElementById('displayArtist').innerText = st.current.artist;
-        document.getElementById('coverArt').src = st.current.thumbnail;
-      }
+        if (st.current) {
+          document.getElementById('displayTitle').innerText = st.current.title.toUpperCase();
+          document.getElementById('displayArtist').innerText = st.current.artist;
+          document.getElementById('coverArt').src = st.current.thumbnail;
+        }
 
-      document.getElementById('btnBass').innerText = st.bass_boost ? 'ENABLED' : 'DISABLED';
-      document.getElementById('btnNightcore').innerText = st.nightcore ? 'ENABLED' : 'DISABLED';
+        const queueList = document.getElementById('queueList');
+        if (st.queue && st.queue.length > 0) {
+          queueList.innerHTML = st.queue.map((item, idx) => `
+            <li class="queue-card">
+              <span style="font-family:var(--mono); color:var(--accent-cyan);">[#${idx + 1}] ${item.title}</span>
+              <button style="background:none; border:none; color:var(--danger); cursor:pointer;" onclick="removeQueueIndex(${idx})">[X]</button>
+            </li>
+          `).join('');
+        } else {
+          queueList.innerHTML = `<li style="color:var(--text-muted); font-family:var(--mono); text-align:center;">Stack Empty</li>`;
+        }
 
-      const queueList = document.getElementById('queueList');
-      if (st.queue && st.queue.length > 0) {
-        queueList.innerHTML = st.queue.map((item, idx) => `
-          <li class="queue-card">
-            <span style="font-family:var(--mono); color:var(--accent-cyan);">[#${idx + 1}] ${item.title}</span>
-            <button style="background:none; border:none; color:var(--danger); cursor:pointer;" onclick="removeQueueIndex(${idx})">[X]</button>
-          </li>
-        `).join('');
-      } else {
-        queueList.innerHTML = `<li style="color:var(--text-muted); font-family:var(--mono); text-align:center;">Stack Empty</li>`;
-      }
-
-      if (st.logs) {
-        document.getElementById('logTerminal').innerHTML = st.logs.map(l => `<div>${l}</div>`).join('');
-      }
+        if (st.logs) {
+          document.getElementById('logTerminal').innerHTML = st.logs.map(l => `<div>${l}</div>`).join('');
+        }
+      } catch (e) {}
     }
 
     initGuilds();
